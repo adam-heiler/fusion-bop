@@ -1,8 +1,14 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import RankineCycle from '../components/RankineCycle.svelte';
 ---
 <BaseLayout title="H2O Rankine">
-  <h1 class="text-3xl font-bold">Supercritical H2O Rankine Cycle</h1>
-  <p>Static background content goes here.</p>
-  <!-- Rankine cycle Svelte component goes here, client:only -->
+  <div style="max-width: 1100px; margin: 0 auto;">
+    <h1 class="text-3xl font-bold mb-2">Supercritical H₂O Rankine Cycle</h1>
+    <p class="mb-6" style="color: #aab3a3; font-size: 14px;">
+      250 bar supercritical reheat regenerative cycle — 6 closed feedwater heaters,
+      deaerator, 7 extraction bleeds, cooling-tower condenser. Heat duty Q = 1000 MW fixed.
+    </p>
+    <RankineCycle client:only="svelte" />
+  </div>
 </BaseLayout>

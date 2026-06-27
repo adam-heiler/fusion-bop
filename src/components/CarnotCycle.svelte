@@ -97,6 +97,7 @@
       </div>
       <input
         id="th-slider"
+        class="th-slider"
         type="range"
         min="500"
         max="1200"
@@ -113,6 +114,7 @@
       </div>
       <input
         id="tc-slider"
+        class="tc-slider"
         type="range"
         min="250"
         max="700"
@@ -166,9 +168,9 @@
       <div class="readout-card">
         <p class="readout-label">Exergy in, Ex<sub>H</sub></p>
         <p class="readout-value">{fmt(exIn, 1)} <span class="readout-unit">kJ</span></p>
+        <p class="exergy-note">Ref. environment: T<sub>0</sub> = T<sub>C</sub></p>
       </div>
     </div>
-    <p class="exergy-note">Exergy reference environment: T<sub>0</sub> = T<sub>C</sub></p>
   </div>
 
   <div class="diagram-col">
@@ -260,6 +262,14 @@
 
   input[type="range"] {
     width: 100%;
+  }
+
+  .th-slider {
+    accent-color: #e8935f;
+  }
+
+  .tc-slider {
+    accent-color: #5ba3e8;
   }
 
   .gauge-grid {
@@ -354,9 +364,9 @@
   }
 
   .exergy-note {
-    font-size: 12px;
+    font-size: 11px;
     color: #8d9686;
-    margin: 8px 2px 0;
+    margin: 6px 0 0;
   }
 
   .ts-svg {
