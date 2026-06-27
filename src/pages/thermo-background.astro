@@ -1,8 +1,13 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import CarnotCycle from '../components/CarnotCycle.svelte';
 ---
 <BaseLayout title="Thermodynamics Background">
-  <h1 class="text-3xl font-bold">Thermodynamics Background</h1>
-  <p>Static background content goes here.</p>
-  <!-- Carnot cycle Svelte component goes here, client:only -->
+  <h1 class="text-3xl font-bold mb-4">Thermodynamics Background</h1>
+  <p class="mb-8">Static background content goes here.</p>
+
+  <div style="max-width: 900px; margin: 0 auto;">
+    <h2 class="text-xl font-medium mb-4">The Carnot cycle</h2>
+    <CarnotCycle client:only="svelte" />
+  </div>
 </BaseLayout>
