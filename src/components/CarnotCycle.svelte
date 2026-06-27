@@ -160,12 +160,12 @@
         <p class="readout-value">{fmt(W, 1)} <span class="readout-unit">kJ</span></p>
       </div>
       <div class="readout-card">
-        <p class="readout-label">Exergy in, Ex<sub>H</sub></p>
-        <p class="readout-value">{fmt(exIn, 1)} <span class="readout-unit">kJ</span></p>
-      </div>
-      <div class="readout-card">
         <p class="readout-label">&Delta;T (T<sub>H</sub> &minus; T<sub>C</sub>)</p>
         <p class="readout-value">{fmt(deltaT, 0)} <span class="readout-unit">K</span></p>
+      </div>
+      <div class="readout-card">
+        <p class="readout-label">Exergy in, Ex<sub>H</sub></p>
+        <p class="readout-value">{fmt(exIn, 1)} <span class="readout-unit">kJ</span></p>
       </div>
     </div>
     <p class="exergy-note">Exergy reference environment: T<sub>0</sub> = T<sub>C</sub></p>
