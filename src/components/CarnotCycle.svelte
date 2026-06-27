@@ -127,7 +127,7 @@
         <p class="gauge-label">1st law efficiency</p>
         <svg viewBox="0 0 160 100" class="gauge-svg">
           <path d={gauge1TrackPath} fill="none" stroke="#22251f" stroke-width="10" />
-          <path d={gauge1FillPath} fill="none" stroke="#ef9f27" stroke-width="10" stroke-linecap="round" />
+          <path d={gauge1FillPath} fill="none" stroke="#ef9f27" stroke-width="10" />
           <line x1={gaugeCx} y1={gaugeCy} x2={gauge1NeedleTip.x} y2={gauge1NeedleTip.y} stroke="#fac775" stroke-width="2.5" stroke-linecap="round" />
           <circle cx={gaugeCx} cy={gaugeCy} r="5" fill="#fac775" />
           <text x="20" y="98" class="gauge-tick">0%</text>
@@ -140,7 +140,7 @@
         <p class="gauge-label">2nd law efficiency</p>
         <svg viewBox="0 0 160 100" class="gauge-svg">
           <path d={gauge2TrackPath} fill="none" stroke="#22251f" stroke-width="10" />
-          <path d={gauge2FillPath} fill="none" stroke="#5dcaa5" stroke-width="10" stroke-linecap="round" />
+          <path d={gauge2FillPath} fill="none" stroke="#5dcaa5" stroke-width="10" />
           <line x1={gaugeCx} y1={gaugeCy} x2={gauge2NeedleTip.x} y2={gauge2NeedleTip.y} stroke="#9fe1cb" stroke-width="2.5" stroke-linecap="round" />
           <circle cx={gaugeCx} cy={gaugeCy} r="5" fill="#9fe1cb" />
           <text x="20" y="98" class="gauge-tick">0%</text>
