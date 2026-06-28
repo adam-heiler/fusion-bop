@@ -1,14 +1,22 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { init, solveCycle, getDome } from '../lib/rankineSolver.js';
+  import { init, solveCycle, getDome, minPC as solverMinPC, minPG as solverMinPG } from '../lib/rankineSolver.js';
 
-  // ── Slider state ─────────────────────────────────────────────────────────────
+  // -- Slider state -----------------------------------------------------------
+  let P1            = $state(250);
   let T1            = $state(540);
   let T3            = $state(500);
   let P2            = $state(60);
   let P4            = $state(5);
   let reheat_dP_pct = $state(3);
   let P_VA          = $state(117);
+  let P_B           = $state(100);
+  let P_C           = $state(7.5);
+  let P_D           = $state(6);
+  let P_E           = $state(4.3);
+  let P_F           = $state(2.2);
+  let P_G           = $state(1.5);
+  let Q             = $state(1000);
   let eta_HP   = $state(0.85);
   let eta_IP   = $state(0.85);
   let eta_LP   = $state(0.85);
@@ -21,14 +29,124 @@
   let cond_TTD    = $state(2.8);
 
   const FIXED = {
-    P1: 250, P_B: 100, P_C: 7.5, P_D: 6,
-    P_E: 4.3, P_F: 2.2, P_G: 1.5,
-    P_condpump: 5, P_feedpump: 250, Q: 1000, subcool: 2.8,
+    P_condpump: 5, P_feedpump: 250, subcool: 2.8,
   };
+
+  // ── Pressure ordering enforcement ───────────────────────────────────────────
+  // Required chain (boiler -> condenser): P1 > P_VA > P_B > P2 > P_C > P_D > P4 > P_E >
+  // P_F > P_G. Each pressure is a heater/turbine-bleed point along the expansion path; if
+  // this ordering is violated the cycle is not physically meaningful (e.g. a "later"
+  // feedwater heater would need to heat the feedwater to a LOWER temperature than an
+  // earlier one already achieved). Sliders keep their full static range for a stable,
+  // non-jumpy track, but any edit is clamped against its neighbors immediately after, with
+  // a brief warning shown if a clamp actually had to engage.
+  //
+  // TWO of these boundaries (P_C against the deaerator at P_D, and P_G against the
+  // condenser) are NOT safely covered by pressure ordering alone: every FWH-to-FWH boundary
+  // has the SAME terminal temperature difference (TTD) subtracted on both sides, so it
+  // cancels out and pure pressure ordering is sufficient there. But the deaerator and
+  // condenser outlets are saturated liquid with NO TTD subtracted (they're direct-contact/
+  // phase-change vessels, not TTD-rated heat exchangers) — so FWH4 (against the deaerator)
+  // and FWH1 (against the condenser) each need an EXTRA temperature margin worth of
+  // pressure headroom that grows with the TTD slider. Get this wrong and the corresponding
+  // extraction fraction (c or g) goes negative, which is unphysical (steam flowing
+  // backward into the turbine) even though the solver itself won't crash.
+  const GAP = 0.1; // bar, minimum enforced separation for the simple FWH-to-FWH boundaries
+
+  let orderWarning = $state('');
+  let warnTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  function flagOrder(msg: string) {
+    orderWarning = msg;
+    if (warnTimeout) clearTimeout(warnTimeout);
+    warnTimeout = setTimeout(() => { orderWarning = ''; }, 2800);
+  }
+
+  // Minimum P_C such that FWH4's TTD-determined feedwater outlet temperature stays above
+  // what the deaerator + feedwater pump already delivers. Solved numerically inside
+  // rankineSolver.js (a few cheap CoolProp calls) rather than in closed form, since the
+  // feedwater pump's enthalpy rise doesn't invert analytically.
+  function minPC(): number {
+    return solverMinPC(P_D, TTD, eta_pump);
+  }
+
+  // Minimum P_G such that FWH1's TTD-determined feedwater outlet stays above what the
+  // condenser + condensate pump already delivers. Same numeric approach.
+  function minPG(): number {
+    return solverMinPG(T0, RH, cw_approach, cond_TTD, TTD, eta_pump);
+  }
+
+  function enforceOrder(changed: string) {
+    // Walk the chain in both directions from the slider that just moved, pushing
+    // neighbors out of the way only enough to restore a valid strict ordering.
+    const chain: [string, () => number, (v: number) => void][] = [
+      ['P1',   () => P1,   v => P1 = v],
+      ['P_VA', () => P_VA, v => P_VA = v],
+      ['P_B',  () => P_B,  v => P_B = v],
+      ['P2',   () => P2,   v => P2 = v],
+      ['P_C',  () => P_C,  v => P_C = v],
+      ['P_D',  () => P_D,  v => P_D = v],
+      ['P4',   () => P4,   v => P4 = v],
+      ['P_E',  () => P_E,  v => P_E = v],
+      ['P_F',  () => P_F,  v => P_F = v],
+      ['P_G',  () => P_G,  v => P_G = v],
+    ];
+    const idx = chain.findIndex(([name]) => name === changed);
+    if (idx === -1) return;
+
+    let clamped = false;
+
+    for (let i = idx - 1; i >= 0; i--) {
+      const [, get, set] = chain[i];
+      const [, getBelow] = chain[i + 1];
+      if (get() <= getBelow() + GAP) {
+        set(getBelow() + GAP);
+        clamped = true;
+      }
+    }
+    for (let i = idx + 1; i < chain.length; i++) {
+      const [, get, set] = chain[i];
+      const [, getAbove] = chain[i - 1];
+      if (get() >= getAbove() - GAP) {
+        set(Math.max(0.01, getAbove() - GAP));
+        clamped = true;
+      }
+    }
+
+    // Special TTD-aware boundaries: re-check AFTER the plain ordering pass above, since
+    // these need a bigger margin than the simple ordering clamp provides.
+    const pcMin = minPC();
+    if (pcMin > 0 && P_C < pcMin) {
+      P_C = pcMin;
+      clamped = true;
+      // P_C may now have been pushed above P_B - GAP; re-run the simple ordering pass
+      // upward from P_C to keep everything above it consistent.
+      for (let i = chain.findIndex(([n]) => n === 'P_C') - 1; i >= 0; i--) {
+        const [, get, set] = chain[i];
+        const [, getBelow] = chain[i + 1];
+        if (get() <= getBelow() + GAP) set(getBelow() + GAP);
+      }
+    }
+    const pgMin = minPG();
+    if (pgMin > 0 && P_G < pgMin) {
+      P_G = pgMin;
+      clamped = true;
+      for (let i = chain.findIndex(([n]) => n === 'P_G') - 1; i >= chain.findIndex(([n]) => n === 'P4'); i--) {
+        const [, get, set] = chain[i];
+        const [, getBelow] = chain[i + 1];
+        if (get() <= getBelow() + GAP) set(getBelow() + GAP);
+      }
+    }
+
+    if (clamped) {
+      flagOrder(`Adjacent pressure(s) shifted to keep ${changed} thermodynamically valid (each stage must heat the feedwater above what the previous stage already delivered).`);
+    }
+  }
 
   function params() {
     return {
-      T1, T3, P2, P4, reheat_dP_pct, P_VA,
+      P1, T1, T3, P2, P4, reheat_dP_pct, P_VA,
+      P_B, P_C, P_D, P_E, P_F, P_G, Q,
       eta_HP, eta_IP, eta_LP, eta_pump, eta_gen, TTD,
       T0, RH, cw_approach, cond_TTD,
       ...FIXED,
@@ -48,6 +166,11 @@
     } catch (e: any) {
       errMsg = String(e);
     }
+  }
+
+  function onPressureChange(name: string) {
+    enforceOrder(name);
+    runSolve();
   }
 
   onMount(async () => {
@@ -103,14 +226,9 @@
   const S_TICKS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
   function fmt(v: number | null | undefined, d = 1) {
-    return v != null ? v.toFixed(d) : '—';
+    return v != null ? v.toFixed(d) : '-';
   }
 
-  // Label nudge: [dx, dy] relative to the state circle
-  const NUDGE: Record<number, [number, number]> = {
-    1: [6, -8], 2: [6, 12], 3: [6, -8], 4: [6, 8],
-    5: [6, -9], 6: [-14, -8], 12: [6, -8], 16: [6, -8],
-  };
 </script>
 
 <div class="rankine-wrap">
@@ -124,6 +242,10 @@
   {:else}
     <!-- ── Left column ─────────────────────────────────────────────────────── -->
     <div class="controls-col">
+
+      {#if orderWarning}
+        <div class="order-warning">{orderWarning}</div>
+      {/if}
 
       <!-- Gauges -->
       {#if result}
@@ -159,6 +281,10 @@
       <div class="slider-group">
         <p class="group-label">Steam conditions</p>
         <div class="slider-row">
+          <div class="slider-label"><label>Boiler outlet P₁</label><span class="slider-value">{P1} bar</span></div>
+          <input type="range" min="30" max="300" step="1" bind:value={P1} onchange={() => onPressureChange('P1')} />
+        </div>
+        <div class="slider-row">
           <div class="slider-label"><label>Boiler outlet T₁</label><span class="slider-value">{T1} °C</span></div>
           <input type="range" min="480" max="600" step="5" bind:value={T1} onchange={runSolve} />
         </div>
@@ -168,11 +294,11 @@
         </div>
         <div class="slider-row">
           <div class="slider-label"><label>HP exhaust P₂</label><span class="slider-value">{P2} bar</span></div>
-          <input type="range" min="30" max="100" step="1" bind:value={P2} onchange={runSolve} />
+          <input type="range" min="30" max="100" step="1" bind:value={P2} onchange={() => onPressureChange('P2')} />
         </div>
         <div class="slider-row">
           <div class="slider-label"><label>IP exhaust P₄</label><span class="slider-value">{P4} bar</span></div>
-          <input type="range" min="2" max="20" step="0.5" bind:value={P4} onchange={runSolve} />
+          <input type="range" min="2" max="20" step="0.5" bind:value={P4} onchange={() => onPressureChange('P4')} />
         </div>
         <div class="slider-row">
           <div class="slider-label"><label>Reheat ΔP</label><span class="slider-value">{reheat_dP_pct} %</span></div>
@@ -180,7 +306,39 @@
         </div>
         <div class="slider-row">
           <div class="slider-label"><label>FWH6 shell P (Valve A)</label><span class="slider-value">{P_VA} bar</span></div>
-          <input type="range" min="60" max="200" step="1" bind:value={P_VA} onchange={runSolve} />
+          <input type="range" min="60" max="200" step="1" bind:value={P_VA} onchange={() => onPressureChange('P_VA')} />
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><label>Steam generator duty Q</label><span class="slider-value">{Q} MW</span></div>
+          <input type="range" min="200" max="2000" step="50" bind:value={Q} onchange={runSolve} />
+        </div>
+      </div>
+
+      <div class="slider-group">
+        <p class="group-label">Extraction pressures</p>
+        <div class="slider-row">
+          <div class="slider-label"><label>P<sub>B</sub> (FWH5 / HP bleed)</label><span class="slider-value">{P_B} bar</span></div>
+          <input type="range" min="50" max="150" step="1" bind:value={P_B} onchange={() => onPressureChange('P_B')} />
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><label>P<sub>C</sub> (FWH4 / IP bleed)</label><span class="slider-value">{P_C} bar</span></div>
+          <input type="range" min="4" max="15" step="0.1" bind:value={P_C} onchange={() => onPressureChange('P_C')} />
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><label>P<sub>D</sub> (Deaerator / IP bleed)</label><span class="slider-value">{P_D} bar</span></div>
+          <input type="range" min="3" max="12" step="0.1" bind:value={P_D} onchange={() => onPressureChange('P_D')} />
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><label>P<sub>E</sub> (FWH3 / LP bleed)</label><span class="slider-value">{P_E} bar</span></div>
+          <input type="range" min="2" max="8" step="0.1" bind:value={P_E} onchange={() => onPressureChange('P_E')} />
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><label>P<sub>F</sub> (FWH2 / LP bleed)</label><span class="slider-value">{P_F} bar</span></div>
+          <input type="range" min="1" max="5" step="0.1" bind:value={P_F} onchange={() => onPressureChange('P_F')} />
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><label>P<sub>G</sub> (FWH1 / LP bleed)</label><span class="slider-value">{P_G} bar</span></div>
+          <input type="range" min="0.5" max="3" step="0.05" bind:value={P_G} onchange={() => onPressureChange('P_G')} />
         </div>
       </div>
 
@@ -286,7 +444,7 @@
 
     <!-- ── Right column: T-s diagram ──────────────────────────────────────── -->
     <div class="diagram-col">
-      <p class="diagram-title">Temperature–Entropy (T–s) Diagram</p>
+      <p class="diagram-title">Temperature-Entropy (T-s) Diagram</p>
 
       <svg viewBox="0 0 {SVG_W} {SVG_H}" class="ts-svg" role="img"
            aria-label="T-s diagram of the supercritical reheat regenerative Rankine cycle">
@@ -308,51 +466,52 @@
               transform={`rotate(-90,${PL-38},${PT+CH/2})`}>T (°C)</text>
         <text x={PL+CW/2} y={SVG_H-2} class="axis-label" text-anchor="middle">s  (kJ / kg·K)</text>
 
-        <!-- Saturation dome — drawn first so cycle paths render on top -->
+        <!-- Saturation dome: single connected path up liquid side then down vapor side -->
         {#if dome}
-          <path d={pathD(dome.liq)} class="dome" />
-          <path d={pathD(dome.vap)} class="dome" />
-          <circle cx={sx(dome.liq[dome.liq.length-1][0])} cy={ty(dome.liq[dome.liq.length-1][1])} r="4" class="dome-crit" />
+          <path d={pathD(dome.dome)} class="dome" />
         {/if}
 
         {#if result}
           {@const r = result}
 
-          <!-- Feedwater heating: 6→…→12→…→16 (draw first, under boiler path) -->
+          <!-- FWH shell-side paths: drawn first (under everything else) -->
+          {#each r.fwhShellPaths as fp}
+            <!-- Desuperheat: extraction point down to sat-vapor boundary -->
+            <line x1={sx(fp.sEx)} y1={ty(fp.TEx)} x2={sx(fp.sg)} y2={ty(fp.Tsat)} class="path-shell" />
+            <!-- Condensation: horizontal across the dome -->
+            <line x1={sx(fp.sg)} y1={ty(fp.Tsat)} x2={sx(fp.sf)} y2={ty(fp.Tsat)} class="path-shell" />
+          {/each}
+
+          <!-- Feedwater train: 6 through all states to 16 -->
           <path d={pathD(r.fwPath)} class="path-fw" />
 
-          <!-- Boiler: supercritical heating 16→1 -->
+          <!-- Boiler: 16 to 1 (handles subcritical boiling plateau or supercritical smooth heating) -->
           <path d={pathD(r.boilerPath)} class="path-boiler" />
 
-          <!-- HP turbine: 1→2 -->
-          <line x1={sx(r.s1)} y1={ty(r.statePoints[1][1])}
-                x2={sx(r.s2)} y2={ty(r.statePoints[2][1])}
-                class="path-expand" />
+          <!-- HP turbine: 1 to ext_A to ext_B to 2 -->
+          <path d={pathD(r.hpPath)} class="path-expand" />
 
-          <!-- Reheater: 2→3 -->
+          <!-- Reheater: 2 to 3 -->
           <path d={pathD(r.reheatPath)} class="path-reheat" />
 
-          <!-- IP turbine: 3→4 -->
-          <line x1={sx(r.s3)} y1={ty(r.statePoints[3][1])}
-                x2={sx(r.s4)} y2={ty(r.statePoints[4][1])}
-                class="path-expand" />
+          <!-- IP turbine: 3 to ext_C to ext_D to 4 -->
+          <path d={pathD(r.ipPath)} class="path-expand" />
 
-          <!-- LP turbine: 4→5 -->
-          <line x1={sx(r.s4)} y1={ty(r.statePoints[4][1])}
-                x2={sx(r.s5)} y2={ty(r.statePoints[5][1])}
-                class="path-expand" />
+          <!-- LP turbine: 4 to ext_E to ext_F to ext_G to 5 -->
+          <path d={pathD(r.lpPath)} class="path-expand" />
 
-          <!-- Condenser: 5→6 -->
+          <!-- Condenser: 5 to 6 -->
           <line x1={sx(r.s5)} y1={ty(r.statePoints[5][1])}
                 x2={sx(r.s6)} y2={ty(r.statePoints[6][1])}
                 class="path-cond" />
 
-          <!-- State circles and labels -->
-          {#each [1, 2, 3, 4, 5, 6, 12, 16] as n}
-            {@const [sp, Tp] = r.statePoints[n]}
-            {@const [dx, dy] = NUDGE[n] ?? [6, 4]}
-            <circle cx={sx(sp)} cy={ty(Tp)} r="4" class="state-pt" />
-            <text x={sx(sp) + dx} y={ty(Tp) + dy} class="state-label">{n}</text>
+          <!-- All state circles, hover label via title, no permanent text -->
+          {#each Object.entries(r.statePoints) as [name, [sp, Tp, tip]]}
+            {@const isExtraction = 'ABCDEFG'.includes(name)}
+            <circle cx={sx(sp)} cy={ty(Tp)} r={isExtraction ? 3 : 4}
+                    class={isExtraction ? 'state-pt-ex' : 'state-pt'}>
+              <title>{tip}</title>
+            </circle>
           {/each}
         {/if}
       </svg>
@@ -363,18 +522,8 @@
         <span class="leg leg-expand">Turbines</span>
         <span class="leg leg-cond">Condenser</span>
         <span class="leg leg-fw">Feedwater</span>
+        <span class="leg leg-shell">FWH shells</span>
         <span class="leg leg-dome">Sat. dome</span>
-      </div>
-
-      <!-- Fixed parameters -->
-      <div class="fixed-params">
-        <p class="group-label" style="margin-bottom:4px">Fixed parameters</p>
-        <div class="fixed-grid">
-          <span>P₁ = 250 bar</span><span>P<sub>B</sub> = 100 bar</span>
-          <span>P<sub>C</sub> = 7.5 bar</span><span>P<sub>D</sub> = 6 bar</span>
-          <span>P<sub>E</sub> = 4.3 bar</span><span>P<sub>F</sub> = 2.2 bar</span>
-          <span>P<sub>G</sub> = 1.5 bar</span><span>Q = 1000 MW</span>
-        </div>
       </div>
     </div>
   {/if}
@@ -405,6 +554,11 @@
   .error-banner {
     grid-column: 1 / -1; background: #3a2020; border: 1px solid #7a3030;
     border-radius: 6px; padding: 12px 16px; color: #f4a0a0; font-size: 14px;
+  }
+  .order-warning {
+    background: #3a3420; border: 1px solid #7a6a30; border-radius: 6px;
+    padding: 9px 12px; color: #f4d8a0; font-size: 12.5px; margin-bottom: 12px;
+    line-height: 1.4;
   }
 
   /* Gauges */
@@ -478,13 +632,6 @@
   }
   .bleed-key { font-weight: 600; color: #ef9f27; }
 
-  /* Fixed params */
-  .fixed-params { margin-top: 12px; }
-  .fixed-grid {
-    display: grid; grid-template-columns: repeat(4, 1fr);
-    gap: 4px 10px; font-size: 12px; color: #7d8676;
-  }
-
   /* Diagram */
   .diagram-col { position: sticky; top: 16px; }
   .diagram-title {
@@ -507,9 +654,10 @@
   .path-expand  { fill: none; stroke: #d6dad0; stroke-width: 2; }
   .path-cond    { fill: none; stroke: #5ba3e8; stroke-width: 2; }
   .path-fw      { fill: none; stroke: #5dcaa5; stroke-width: 1.5; stroke-dasharray: 4 3; }
+  .path-shell   { fill: none; stroke: #7ba8cc; stroke-width: 1.2; stroke-dasharray: 3 3; opacity: 0.7; }
 
-  .state-pt    { fill: #f4f6f2; }
-  .state-label { font-size: 11px; font-weight: 600; fill: #f4f6f2; }
+  .state-pt    { fill: #f4f6f2; cursor: default; }
+  .state-pt-ex { fill: #ef9f27; stroke: #f4f6f2; stroke-width: 0.5; cursor: default; }
 
   /* Legend */
   .diagram-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 7px; }
@@ -523,5 +671,6 @@
   .leg-expand::before { background: #d6dad0; }
   .leg-cond::before   { background: #5ba3e8; }
   .leg-fw::before     { background: #5dcaa5; }
-  .leg-dome::before   { background: #8fa888; }
+  .leg-shell::before  { background: #7ba8cc; }
+  .leg-dome::before   { background: #b5d9ac; }
 </style>
