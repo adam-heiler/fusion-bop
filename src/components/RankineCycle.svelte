@@ -213,10 +213,6 @@
   function sx(s: number) { return PL + (s - S_LO) / (S_HI - S_LO) * CW; }
   function ty(T: number) { return PT + CH * (1 - (T - T_LO) / (T_HI - T_LO)); }
 
-  function polyline(arr: [number, number][]) {
-    return arr.map(([s, T]) => `${sx(s).toFixed(1)},${ty(T).toFixed(1)}`).join(' ');
-  }
-
   function pathD(arr: [number, number][]) {
     if (!arr || arr.length === 0) return '';
     return 'M ' + arr.map(([s, T]) => `${sx(s).toFixed(1)},${ty(T).toFixed(1)}`).join(' L ');
@@ -281,35 +277,35 @@
       <div class="slider-group">
         <p class="group-label">Steam conditions</p>
         <div class="slider-row">
-          <div class="slider-label"><label>Boiler outlet P₁</label><span class="slider-value">{P1} bar</span></div>
+          <div class="slider-label"><span>Boiler outlet P₁</span><span class="slider-value">{P1} bar</span></div>
           <input type="range" min="30" max="300" step="1" bind:value={P1} onchange={() => onPressureChange('P1')} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>Boiler outlet T₁</label><span class="slider-value">{T1} °C</span></div>
+          <div class="slider-label"><span>Boiler outlet T₁</span><span class="slider-value">{T1} °C</span></div>
           <input type="range" min="480" max="600" step="5" bind:value={T1} onchange={runSolve} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>Reheater outlet T₃</label><span class="slider-value">{T3} °C</span></div>
+          <div class="slider-label"><span>Reheater outlet T₃</span><span class="slider-value">{T3} °C</span></div>
           <input type="range" min="480" max="600" step="5" bind:value={T3} onchange={runSolve} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>HP exhaust P₂</label><span class="slider-value">{P2} bar</span></div>
+          <div class="slider-label"><span>HP exhaust P₂</span><span class="slider-value">{P2} bar</span></div>
           <input type="range" min="30" max="100" step="1" bind:value={P2} onchange={() => onPressureChange('P2')} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>IP exhaust P₄</label><span class="slider-value">{P4} bar</span></div>
+          <div class="slider-label"><span>IP exhaust P₄</span><span class="slider-value">{P4} bar</span></div>
           <input type="range" min="2" max="20" step="0.5" bind:value={P4} onchange={() => onPressureChange('P4')} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>Reheat ΔP</label><span class="slider-value">{reheat_dP_pct} %</span></div>
+          <div class="slider-label"><span>Reheat ΔP</span><span class="slider-value">{reheat_dP_pct} %</span></div>
           <input type="range" min="0" max="8" step="0.5" bind:value={reheat_dP_pct} onchange={runSolve} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>FWH6 shell P (Valve A)</label><span class="slider-value">{P_VA} bar</span></div>
+          <div class="slider-label"><span>FWH6 shell P (Valve A)</span><span class="slider-value">{P_VA} bar</span></div>
           <input type="range" min="60" max="200" step="1" bind:value={P_VA} onchange={() => onPressureChange('P_VA')} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>Steam generator duty Q</label><span class="slider-value">{Q} MW</span></div>
+          <div class="slider-label"><span>Steam generator duty Q</span><span class="slider-value">{Q} MW</span></div>
           <input type="range" min="200" max="2000" step="50" bind:value={Q} onchange={runSolve} />
         </div>
       </div>
@@ -317,27 +313,27 @@
       <div class="slider-group">
         <p class="group-label">Extraction pressures</p>
         <div class="slider-row">
-          <div class="slider-label"><label>P<sub>B</sub> (FWH5 / HP bleed)</label><span class="slider-value">{P_B} bar</span></div>
+          <div class="slider-label"><span>P<sub>B</sub> (FWH5 / HP bleed)</span><span class="slider-value">{P_B} bar</span></div>
           <input type="range" min="50" max="150" step="1" bind:value={P_B} onchange={() => onPressureChange('P_B')} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>P<sub>C</sub> (FWH4 / IP bleed)</label><span class="slider-value">{P_C} bar</span></div>
+          <div class="slider-label"><span>P<sub>C</sub> (FWH4 / IP bleed)</span><span class="slider-value">{P_C} bar</span></div>
           <input type="range" min="4" max="15" step="0.1" bind:value={P_C} onchange={() => onPressureChange('P_C')} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>P<sub>D</sub> (Deaerator / IP bleed)</label><span class="slider-value">{P_D} bar</span></div>
+          <div class="slider-label"><span>P<sub>D</sub> (Deaerator / IP bleed)</span><span class="slider-value">{P_D} bar</span></div>
           <input type="range" min="3" max="12" step="0.1" bind:value={P_D} onchange={() => onPressureChange('P_D')} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>P<sub>E</sub> (FWH3 / LP bleed)</label><span class="slider-value">{P_E} bar</span></div>
+          <div class="slider-label"><span>P<sub>E</sub> (FWH3 / LP bleed)</span><span class="slider-value">{P_E} bar</span></div>
           <input type="range" min="2" max="8" step="0.1" bind:value={P_E} onchange={() => onPressureChange('P_E')} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>P<sub>F</sub> (FWH2 / LP bleed)</label><span class="slider-value">{P_F} bar</span></div>
+          <div class="slider-label"><span>P<sub>F</sub> (FWH2 / LP bleed)</span><span class="slider-value">{P_F} bar</span></div>
           <input type="range" min="1" max="5" step="0.1" bind:value={P_F} onchange={() => onPressureChange('P_F')} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>P<sub>G</sub> (FWH1 / LP bleed)</label><span class="slider-value">{P_G} bar</span></div>
+          <div class="slider-label"><span>P<sub>G</sub> (FWH1 / LP bleed)</span><span class="slider-value">{P_G} bar</span></div>
           <input type="range" min="0.5" max="3" step="0.05" bind:value={P_G} onchange={() => onPressureChange('P_G')} />
         </div>
       </div>
@@ -345,23 +341,23 @@
       <div class="slider-group">
         <p class="group-label">Isentropic efficiencies</p>
         <div class="slider-row">
-          <div class="slider-label"><label>η HP turbine</label><span class="slider-value">{(eta_HP*100).toFixed(0)} %</span></div>
+          <div class="slider-label"><span>η HP turbine</span><span class="slider-value">{(eta_HP*100).toFixed(0)} %</span></div>
           <input type="range" min="0.5" max="1" step="0.01" bind:value={eta_HP} onchange={runSolve} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>η IP turbine</label><span class="slider-value">{(eta_IP*100).toFixed(0)} %</span></div>
+          <div class="slider-label"><span>η IP turbine</span><span class="slider-value">{(eta_IP*100).toFixed(0)} %</span></div>
           <input type="range" min="0.5" max="1" step="0.01" bind:value={eta_IP} onchange={runSolve} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>η LP turbine</label><span class="slider-value">{(eta_LP*100).toFixed(0)} %</span></div>
+          <div class="slider-label"><span>η LP turbine</span><span class="slider-value">{(eta_LP*100).toFixed(0)} %</span></div>
           <input type="range" min="0.5" max="1" step="0.01" bind:value={eta_LP} onchange={runSolve} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>η pumps (all)</label><span class="slider-value">{(eta_pump*100).toFixed(0)} %</span></div>
+          <div class="slider-label"><span>η pumps (all)</span><span class="slider-value">{(eta_pump*100).toFixed(0)} %</span></div>
           <input type="range" min="0.5" max="1" step="0.01" bind:value={eta_pump} onchange={runSolve} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>η generator</label><span class="slider-value">{(eta_gen*100).toFixed(1)} %</span></div>
+          <div class="slider-label"><span>η generator</span><span class="slider-value">{(eta_gen*100).toFixed(1)} %</span></div>
           <input type="range" min="0.95" max="1" step="0.001" bind:value={eta_gen} onchange={runSolve} />
         </div>
       </div>
@@ -369,7 +365,7 @@
       <div class="slider-group">
         <p class="group-label">Feedwater heating</p>
         <div class="slider-row">
-          <div class="slider-label"><label>FWH terminal temp diff (TTD)</label><span class="slider-value">{TTD} °C</span></div>
+          <div class="slider-label"><span>FWH terminal temp diff (TTD)</span><span class="slider-value">{TTD} °C</span></div>
           <input type="range" min="0" max="15" step="0.5" bind:value={TTD} onchange={runSolve} />
         </div>
       </div>
@@ -377,19 +373,19 @@
       <div class="slider-group">
         <p class="group-label">Cooling / environment</p>
         <div class="slider-row">
-          <div class="slider-label"><label>Ambient temp T₀</label><span class="slider-value">{T0} °C</span></div>
+          <div class="slider-label"><span>Ambient temp T₀</span><span class="slider-value">{T0} °C</span></div>
           <input type="range" min="0" max="40" step="1" bind:value={T0} onchange={runSolve} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>Relative humidity</label><span class="slider-value">{RH} %</span></div>
+          <div class="slider-label"><span>Relative humidity</span><span class="slider-value">{RH} %</span></div>
           <input type="range" min="10" max="99" step="1" bind:value={RH} onchange={runSolve} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>Cooling tower approach</label><span class="slider-value">{cw_approach} °C</span></div>
+          <div class="slider-label"><span>Cooling tower approach</span><span class="slider-value">{cw_approach} °C</span></div>
           <input type="range" min="2" max="15" step="0.1" bind:value={cw_approach} onchange={runSolve} />
         </div>
         <div class="slider-row">
-          <div class="slider-label"><label>Condenser TTD</label><span class="slider-value">{cond_TTD} °C</span></div>
+          <div class="slider-label"><span>Condenser TTD</span><span class="slider-value">{cond_TTD} °C</span></div>
           <input type="range" min="0" max="10" step="0.1" bind:value={cond_TTD} onchange={runSolve} />
         </div>
       </div>
@@ -506,7 +502,7 @@
                 class="path-cond" />
 
           <!-- All state circles, hover label via title, no permanent text -->
-          {#each Object.entries(r.statePoints) as [name, [sp, Tp, tip]]}
+          {#each (Object.entries(r.statePoints) as [string, [number, number, string]][]) as [name, [sp, Tp, tip]]}
             {@const isExtraction = 'ABCDEFG'.includes(name)}
             <circle cx={sx(sp)} cy={ty(Tp)} r={isExtraction ? 3 : 4}
                     class={isExtraction ? 'state-pt-ex' : 'state-pt'}>
@@ -591,7 +587,7 @@
   .slider-label {
     display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px;
   }
-  .slider-label label { font-size: 13px; color: #c9cfc5; }
+  .slider-label span { font-size: 13px; color: #c9cfc5; }
   .slider-value {
     font-size: 13px; font-weight: 600; color: #f4f6f2;
     font-variant-numeric: tabular-nums; min-width: 56px; text-align: right;
@@ -647,7 +643,6 @@
   .axis-label { font-size: 12px; fill: #aab3a3; }
 
   .dome      { fill: none; stroke: #b5d9ac; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-  .dome-crit { fill: #b5d9ac; }
 
   .path-boiler  { fill: none; stroke: #e8935f; stroke-width: 2.5; }
   .path-reheat  { fill: none; stroke: #fac775; stroke-width: 2.5; }
