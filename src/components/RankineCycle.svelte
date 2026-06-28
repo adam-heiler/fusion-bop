@@ -198,6 +198,9 @@
 
   const gaugeTrack = arcPath(0, 1, gR);
 
+  const PCRIT = 220.64; // bar, water critical point
+  const isSupercritical = $derived(P1 >= PCRIT);
+
   // Pre-compute gauge fill arcs and needle tips reactively
   const g1Fill   = $derived(result ? arcPath(0, result.eta_1, gR) : '');
   const g1Needle = $derived(result ? polarPoint(angleForFraction(result.eta_1), gR - 12) : { x: gCx, y: gCy });
@@ -226,6 +229,10 @@
   }
 
 </script>
+
+<h1 class="page-title">
+  <span class="title-super" class:struck={!isSupercritical}>Supercritical</span> H₂O Rankine Cycle
+</h1>
 
 <div class="rankine-wrap">
   {#if loading}
@@ -526,6 +533,20 @@
 </div>
 
 <style>
+  .page-title {
+    font-size: 1.875rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem;
+  }
+  .title-super {
+    transition: text-decoration 0.2s, opacity 0.2s, color 0.2s;
+  }
+  .title-super.struck {
+    text-decoration: line-through;
+    opacity: 0.45;
+    color: #aab3a3;
+  }
+
   .rankine-wrap {
     display: grid;
     grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
