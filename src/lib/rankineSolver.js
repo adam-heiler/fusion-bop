@@ -389,16 +389,20 @@ export function solveCycle(p) {
   const W_net = (W_turb - W_pumps) * p.eta_gen;
   const eta_1 = W_net / Qdot;
 
-  // 2nd law (exergetic) efficiency: W_net / exergy added in boiler
-  // Ex_boiler = m·[(h1−h15) − T0·(s1−s15)]  (flow exergy increase in steam generator)
-  // New state 15 = boiler inlet (was old state 16 before v2 renumbering).
+  // 2nd law (exergetic) efficiency and steam-generator exergy input share ONE denominator.
+  // Ex_sg = external exergy delivered to the working fluid by the steam generator (boiler):
+  //   Ex_sg = m·[(h1−h15) − T0·(s1−s15)]   (flow-exergy increase across the boiler).
+  // The reheater is internally heated by extraction stream a (working-fluid-to-working-fluid),
+  // so it adds NO external exergy — stream a was already heated in the boiler as part of m,
+  // and its exergy is already inside the term below. An earlier version added a reheat term
+  // to Ex_sg only (not to eta_2's denominator): that double-counted internal reheat (~78.7 MW),
+  // so the readout and the gauge disagreed and W_net/Ex_sg (~71.5%) fell below the true
+  // eta_2 (~81.6%) — source: diagnose.py. Defining Ex_sg once and dividing keeps them equal.
+  // (State 15 = boiler inlet, was old state 16 before v2 renumbering.)
   const T0K = p.T0 + C2K;
   const s15_si = Q('S', 'P', Pfw, 'H', h15); // J/kg/K
-  const eta_2 = W_net / (m * ((h1 - h15) - T0K * (s1 - s15_si)));
-
-  // Total exergy transferred to working fluid in steam generator (boiler + reheater)
-  const Ex_sg = m * ((h1 - h15) - T0K * (s1 - s15_si))
-              + (m - a - b) * ((h3 - h2) - T0K * (s3 - s2));
+  const Ex_sg = m * ((h1 - h15) - T0K * (s1 - s15_si));
+  const eta_2 = W_net / Ex_sg;
 
   // T-s diagram paths
 
@@ -449,10 +453,17 @@ export function solveCycle(p) {
 
   // Turbine expansion paths — entropy-parameterized (turbSeg) to avoid the
   // "curved inward" artifact caused by the 250-bar pseudo-critical S-curve.
+  // HP turbine expansion: state 1 -> B bleed (P_B) -> state 2 exhaust (P2).
+  // Stream A is tapped BEFORE the HP turbine (a1 = state 1, source: rankinecycle_v2.xlsx
+  // streams sheet "a: extraction before main stream enters hp turbine"), so it is NOT a
+  // waypoint on this expansion line. Routing the path through the old A point drew a
+  // spurious constant-entropy vertical drop, because s_A_ex now equals s1 — the first leg
+  // turbSeg(s1 -> s1) held entropy pinned at s1 while pressure fell 250->117 bar
+  // (verified in diagnose.py: seven points all at s = 6.1416 kJ/kg·K). B (P_B = 100 bar,
+  // between P1 and P2) is a genuine on-turbine bleed and stays.
   const hpPath = [
-    ...turbSeg(s1,          P1,   s_A_ex*1000, P_VA, 8),
-    ...turbSeg(s_A_ex*1000, P_VA, s_B_ex*1000, P_B,  6).slice(1),
-    ...turbSeg(s_B_ex*1000, P_B,  s2,          P2,   8).slice(1),
+    ...turbSeg(s1,          P1,  s_B_ex*1000, P_B, 10),
+    ...turbSeg(s_B_ex*1000, P_B, s2,          P2,  10).slice(1),
   ];
   const ipPath = [
     ...turbSeg(s3,          P3,  s_C_ex*1000, P_C, 8),
