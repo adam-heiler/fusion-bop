@@ -12,17 +12,111 @@ const { title } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title} | Fusion BOP</title>
   </head>
-  <body class="bg-[#373c35] text-slate-100 min-h-screen">
-    <nav class="flex gap-6 p-4 border-b border-[#2a2e26]">
-      <a href="/">Overview</a>
-      <a href="/thermo-background">Thermodynamics Background</a>
-      <a href="/tokamak-systems">Tokamak Systems</a>
-      <a href="/rankine">H2O Rankine</a>
-      <a href="/co2-brayton">CO2 Brayton</a>
-      <a href="/he-brayton">He Brayton</a>
+  <body class="bg-white text-gray-900 min-h-screen">
+    <nav class="site-nav">
+      <a href="/" class="site-logo">Fusion<span class="logo-bop">BoP</span></a>
+      <div class="nav-links">
+        <a href="/">Overview</a>
+        <a href="/thermo-background">Thermodynamics Background</a>
+        <a href="/tokamak-systems">Tokamak Systems</a>
+        <a href="/rankine">H<sub>2</sub>O Rankine</a>
+        <a href="/co2-brayton">CO<sub>2</sub> Brayton</a>
+        <a href="/he-brayton">He Brayton</a>
+      </div>
     </nav>
     <main class="p-6">
       <slot />
     </main>
   </body>
 </html>
+
+<script>
+  // Keep --pct in sync with each range input's value so the webkit track
+  // gradient shows the correct filled / unfilled split.
+  function setFill(input: HTMLInputElement) {
+    const min = parseFloat(input.min) || 0;
+    const max = parseFloat(input.max) || 100;
+    const pct = ((parseFloat(input.value) - min) / (max - min)) * 100;
+    input.style.setProperty('--pct', pct + '%');
+  }
+
+  function attach(input: HTMLInputElement) {
+    if ((input as any)._sf) return;
+    (input as any)._sf = true;
+    requestAnimationFrame(() => setFill(input));
+    input.addEventListener('input', () => setFill(input));
+  }
+
+  const mo = new MutationObserver(ms => {
+    for (const m of ms)
+      for (const n of m.addedNodes as NodeListOf<Element>)
+        if (n.nodeType === 1) {
+          if ((n as Element).matches?.('input[type="range"]')) attach(n as HTMLInputElement);
+          (n as Element).querySelectorAll?.('input[type="range"]').forEach(el => attach(el as HTMLInputElement));
+        }
+  });
+  mo.observe(document.documentElement, { childList: true, subtree: true });
+  document.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(attach);
+</script>
+
+<style is:global>
+  .site-nav {
+    display: flex;
+    align-items: center;
+    padding: 0 1.25rem;
+    border-bottom: 1px solid #e5e7eb;
+    height: 52px;
+  }
+
+  .site-nav .site-logo {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #1a1f18;
+    text-decoration: none;
+    margin-right: 1.75rem;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+  .site-nav .site-logo:hover  { opacity: 0.7; }
+  .site-nav .site-logo:active { opacity: 0.45; transform: translateY(1px); }
+
+  .site-nav .logo-bop { color: #14b8a6; }
+
+  .site-nav .nav-links {
+    display: flex;
+    align-items: center;
+    height: 100%;
+  }
+
+  .site-nav .nav-links a {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #4a5244;
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .site-nav .nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0.75rem;
+    right: 0.75rem;
+    height: 2px;
+    background: #14b8a6;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.2s ease;
+    border-radius: 1px 1px 0 0;
+  }
+
+  .site-nav .nav-links a:hover { color: #1a1f18; }
+  .site-nav .nav-links a:hover::after { transform: scaleX(1); }
+  .site-nav .nav-links a:active { color: #14b8a6; transform: translateY(1px); }
+</style>

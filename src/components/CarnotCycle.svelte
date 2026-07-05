@@ -128,10 +128,10 @@
       <div class="gauge-card">
         <p class="gauge-label">1st law efficiency</p>
         <svg viewBox="0 0 160 100" class="gauge-svg">
-          <path d={gauge1TrackPath} fill="none" stroke="#22251f" stroke-width="10" />
+          <path d={gauge1TrackPath} fill="none" stroke="#e0e4dc" stroke-width="10" />
           <path d={gauge1FillPath} fill="none" stroke="#ef9f27" stroke-width="10" />
-          <line x1={gaugeCx} y1={gaugeCy} x2={gauge1NeedleTip.x} y2={gauge1NeedleTip.y} stroke="#fac775" stroke-width="2.5" stroke-linecap="round" />
-          <circle cx={gaugeCx} cy={gaugeCy} r="5" fill="#fac775" />
+          <line x1={gaugeCx} y1={gaugeCy} x2={gauge1NeedleTip.x} y2={gauge1NeedleTip.y} stroke="#c07a10" stroke-width="2.5" stroke-linecap="round" />
+          <circle cx={gaugeCx} cy={gaugeCy} r="5" fill="#c07a10" />
           <text x="20" y="98" class="gauge-tick">0%</text>
           <text x="140" y="98" class="gauge-tick gauge-tick-end">100%</text>
         </svg>
@@ -141,10 +141,10 @@
       <div class="gauge-card">
         <p class="gauge-label">2nd law efficiency</p>
         <svg viewBox="0 0 160 100" class="gauge-svg">
-          <path d={gauge2TrackPath} fill="none" stroke="#22251f" stroke-width="10" />
+          <path d={gauge2TrackPath} fill="none" stroke="#e0e4dc" stroke-width="10" />
           <path d={gauge2FillPath} fill="none" stroke="#5dcaa5" stroke-width="10" />
-          <line x1={gaugeCx} y1={gaugeCy} x2={gauge2NeedleTip.x} y2={gauge2NeedleTip.y} stroke="#9fe1cb" stroke-width="2.5" stroke-linecap="round" />
-          <circle cx={gaugeCx} cy={gaugeCy} r="5" fill="#9fe1cb" />
+          <line x1={gaugeCx} y1={gaugeCy} x2={gauge2NeedleTip.x} y2={gauge2NeedleTip.y} stroke="#1a9b73" stroke-width="2.5" stroke-linecap="round" />
+          <circle cx={gaugeCx} cy={gaugeCy} r="5" fill="#1a9b73" />
           <text x="20" y="98" class="gauge-tick">0%</text>
           <text x="140" y="98" class="gauge-tick gauge-tick-end">100%</text>
         </svg>
@@ -251,26 +251,17 @@
   .slider-label label {
     font-size: 14px;
     font-weight: 500;
-    color: #c9cfc5;
+    color: #4a5244;
   }
 
   .slider-value {
     font-size: 14px;
     font-weight: 600;
-    color: #f4f6f2;
+    color: #1a1f18;
   }
 
-  input[type="range"] {
-    width: 100%;
-  }
-
-  .th-slider {
-    accent-color: #e8935f;
-  }
-
-  .tc-slider {
-    accent-color: #5ba3e8;
-  }
+  .th-slider { --slider-color: #e8935f; }
+  .tc-slider { --slider-color: #5ba3e8; }
 
   .gauge-grid {
     display: grid;
@@ -280,8 +271,8 @@
   }
 
   .gauge-card {
-    background: #2b2f27;
-    border: 1px solid #3d423a;
+    background: #f5f6f4;
+    border: 1px solid #dde1d8;
     border-radius: 6px;
     padding: 14px;
   }
@@ -290,7 +281,7 @@
     font-size: 12px;
     font-weight: 500;
     letter-spacing: 0.04em;
-    color: #aab3a3;
+    color: #6b7566;
     margin: 0 0 10px;
     text-transform: uppercase;
   }
@@ -303,7 +294,7 @@
 
   .gauge-tick {
     font-size: 10px;
-    fill: #7d8676;
+    fill: #8d9686;
   }
 
   .gauge-tick-end {
@@ -319,11 +310,11 @@
   }
 
   .gauge-value-amber {
-    color: #fac775;
+    color: #c07a10;
   }
 
   .gauge-value-teal {
-    color: #9fe1cb;
+    color: #1a9b73;
   }
 
   .readout-grid {
@@ -334,8 +325,8 @@
   }
 
   .readout-card {
-    background: #2b2f27;
-    border: 1px solid #3d423a;
+    background: #f5f6f4;
+    border: 1px solid #dde1d8;
     border-radius: 6px;
     padding: 10px 12px;
   }
@@ -344,7 +335,7 @@
     font-size: 12px;
     font-weight: 500;
     letter-spacing: 0.03em;
-    color: #aab3a3;
+    color: #6b7566;
     margin: 0 0 4px;
     text-transform: uppercase;
   }
@@ -352,14 +343,14 @@
   .readout-value {
     font-size: 18px;
     font-weight: 600;
-    color: #f4f6f2;
+    color: #1a1f18;
     margin: 0;
     font-variant-numeric: tabular-nums;
   }
 
   .readout-unit {
     font-size: 12px;
-    color: #aab3a3;
+    color: #6b7566;
     font-weight: 400;
   }
 
@@ -377,17 +368,17 @@
   }
 
   .axis {
-    stroke: #8d9686;
+    stroke: #9ca89a;
     stroke-width: 1;
   }
 
   .axis-text {
     font-size: 13px;
-    fill: #aab3a3;
+    fill: #6b7566;
   }
 
   .ref-line {
-    stroke: #6b7363;
+    stroke: #c0c8bc;
     stroke-width: 1;
     stroke-dasharray: 3, 3;
   }
@@ -395,7 +386,7 @@
   .ref-text {
     font-size: 14px;
     font-weight: 600;
-    fill: #d6dad0;
+    fill: #2a2f26;
   }
 
   .cycle-fill {
@@ -416,19 +407,19 @@
   }
 
   .edge-adiabat {
-    stroke: #aab3a3;
+    stroke: #9ca89a;
     stroke-width: 1.5;
     stroke-dasharray: 4, 3;
   }
 
   .point {
-    fill: #7dd3fc;
+    fill: #2563eb;
   }
 
   .point-text {
     font-size: 12px;
     font-weight: 500;
-    fill: #f4f6f2;
+    fill: #1a1f18;
   }
 
   .caption-wrap {
@@ -439,7 +430,7 @@
 
   .caption {
     font-size: 13px;
-    color: #aab3a3;
+    color: #6b7566;
     margin: 0;
     line-height: 1.5;
   }
