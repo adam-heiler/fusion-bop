@@ -177,12 +177,18 @@
   let errMsg  = $state<string | null>(null);
 
   function runSolve() {
-    try {
-      result = solveCycle(params());
-      errMsg = null;
-    } catch (e: any) {
-      errMsg = String(e);
-    }
+    // Deferred as a macrotask (not requestAnimationFrame, which runs *before* the
+    // browser's next paint) so the released slider thumb actually gets painted before
+    // the CoolProp solve blocks the main thread — otherwise the thumb stays visually
+    // "stuck" enlarged for the whole calculation, since no repaint can happen mid-block.
+    setTimeout(() => {
+      try {
+        result = solveCycle(params());
+        errMsg = null;
+      } catch (e: any) {
+        errMsg = String(e);
+      }
+    });
   }
 
   function onPressureChange(name: string) {
@@ -221,6 +227,22 @@
   const g2Fill   = $derived(result ? arcPath(0, Math.min(result.eta_2, 1), gR) : '');
   const g2Needle = $derived(result ? polarPoint(angleForFraction(Math.min(result.eta_2, 1)), gR - 12) : { x: gCx, y: gCy });
 
+  // LP exhaust quality gauge — x5 < 0 is the superheated sentinel (no moisture at all,
+  // treated as a full/best-case reading); otherwise fraction is the steam quality itself.
+  const g3Frac   = $derived(result ? (result.x5 >= 0 ? result.x5 : 1) : 0);
+  const g3Fill   = $derived(result ? arcPath(0, g3Frac, gR) : '');
+  const g3Needle = $derived(result ? polarPoint(angleForFraction(g3Frac), gR - 12) : { x: gCx, y: gCy });
+  const g3Warn   = $derived(!!result && result.x5 >= 0 && result.x5 < 0.85);
+  const g3FillColor   = $derived(g3Warn ? '#f3a5a5' : '#8fc1ea');
+  const g3AccentColor = $derived(g3Warn ? '#dc2626' : '#2f6fa8');
+
+  // Pump power fraction (W_pumps / W_turb), on the full 0-100% scale like the other
+  // gauges — deliberately, since the whole point is to show just how small the parasitic
+  // pump load is relative to the turbine's gross output.
+  const g4Raw    = $derived(result ? result.W_pumps / result.W_turb : 0);
+  const g4Fill   = $derived(result ? arcPath(0, g4Raw, gR) : '');
+  const g4Needle = $derived(result ? polarPoint(angleForFraction(g4Raw), gR - 12) : { x: gCx, y: gCy });
+
   // ── T-s diagram geometry ──────────────────────────────────────────────────────
   const SVG_W = 500, SVG_H = 370;
   const PL = 46, PR = 10, PT = 12, PB = 36;
@@ -240,6 +262,14 @@
 
   function fmt(v: number | null | undefined, d = 1) {
     return v != null ? v.toFixed(d) : '-';
+  }
+
+  // Track-fill percentage, computed reactively so the colored bar stays in sync even
+  // when a value changes programmatically (e.g. enforceOrder clamping a neighbor) rather
+  // than via direct user dragging, which is when the global --pct-sync script (attached
+  // only to native 'input' events) would otherwise miss the update.
+  function pct(v: number, min: number, max: number) {
+    return ((v - min) / (max - min)) * 100;
   }
 
 </script>
@@ -271,7 +301,7 @@
         <div class="slider-body">
           <div class="slider-row">
             <div class="slider-label"><span>Boiler outlet P₁</span><span class="slider-value">{P1} bar</span></div>
-            <input id="r-p1" type="range" min="30" max="300" step="1" bind:value={P1} onchange={() => onPressureChange('P1')} />
+            <input id="r-p1" type="range" min="30" max="300" step="1" bind:value={P1} style="--pct: {pct(P1,30,300)}%" onchange={() => onPressureChange('P1')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>Boiler outlet T₁</span><span class="slider-value">{T1} °C</span></div>
@@ -283,11 +313,11 @@
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>HP exhaust P₂</span><span class="slider-value">{P2} bar</span></div>
-            <input id="r-p2" type="range" min="30" max="100" step="1" bind:value={P2} onchange={() => onPressureChange('P2')} />
+            <input id="r-p2" type="range" min="30" max="100" step="1" bind:value={P2} style="--pct: {pct(P2,30,100)}%" onchange={() => onPressureChange('P2')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>IP exhaust P₄</span><span class="slider-value">{P4} bar</span></div>
-            <input id="r-p4" type="range" min="2" max="20" step="0.5" bind:value={P4} onchange={() => onPressureChange('P4')} />
+            <input id="r-p4" type="range" min="2" max="20" step="0.5" bind:value={P4} style="--pct: {pct(P4,2,20)}%" onchange={() => onPressureChange('P4')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>Reheat ΔP</span><span class="slider-value">{reheat_dP_pct} %</span></div>
@@ -295,7 +325,7 @@
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>FWH6 shell P (Valve A)</span><span class="slider-value">{P_VA} bar</span></div>
-            <input id="r-pva" type="range" min="60" max="200" step="1" bind:value={P_VA} onchange={() => onPressureChange('P_VA')} />
+            <input id="r-pva" type="range" min="60" max="200" step="1" bind:value={P_VA} style="--pct: {pct(P_VA,60,200)}%" onchange={() => onPressureChange('P_VA')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>Steam generator duty Q</span><span class="slider-value">{Q} MW</span></div>
@@ -310,27 +340,27 @@
         <div class="slider-body">
           <div class="slider-row">
             <div class="slider-label"><span>P<sub>B</sub> (FWH5 / HP bleed)</span><span class="slider-value">{P_B} bar</span></div>
-            <input id="r-pb" type="range" min="50" max="150" step="1" bind:value={P_B} onchange={() => onPressureChange('P_B')} />
+            <input id="r-pb" type="range" min="50" max="150" step="1" bind:value={P_B} style="--pct: {pct(P_B,50,150)}%" onchange={() => onPressureChange('P_B')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>P<sub>C</sub> (FWH4 / IP bleed)</span><span class="slider-value">{P_C} bar</span></div>
-            <input id="r-pc" type="range" min="4" max="15" step="0.1" bind:value={P_C} onchange={() => onPressureChange('P_C')} />
+            <input id="r-pc" type="range" min="4" max="15" step="0.1" bind:value={P_C} style="--pct: {pct(P_C,4,15)}%" onchange={() => onPressureChange('P_C')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>P<sub>D</sub> (Deaerator / IP bleed)</span><span class="slider-value">{P_D} bar</span></div>
-            <input id="r-pd" type="range" min="3" max="12" step="0.1" bind:value={P_D} onchange={() => onPressureChange('P_D')} />
+            <input id="r-pd" type="range" min="3" max="12" step="0.1" bind:value={P_D} style="--pct: {pct(P_D,3,12)}%" onchange={() => onPressureChange('P_D')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>P<sub>E</sub> (FWH3 / LP bleed)</span><span class="slider-value">{P_E} bar</span></div>
-            <input id="r-pe" type="range" min="2" max="8" step="0.1" bind:value={P_E} onchange={() => onPressureChange('P_E')} />
+            <input id="r-pe" type="range" min="2" max="8" step="0.1" bind:value={P_E} style="--pct: {pct(P_E,2,8)}%" onchange={() => onPressureChange('P_E')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>P<sub>F</sub> (FWH2 / LP bleed)</span><span class="slider-value">{P_F} bar</span></div>
-            <input id="r-pf" type="range" min="1" max="5" step="0.1" bind:value={P_F} onchange={() => onPressureChange('P_F')} />
+            <input id="r-pf" type="range" min="1" max="5" step="0.1" bind:value={P_F} style="--pct: {pct(P_F,1,5)}%" onchange={() => onPressureChange('P_F')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>P<sub>G</sub> (FWH1 / LP bleed)</span><span class="slider-value">{P_G} bar</span></div>
-            <input id="r-pg" type="range" min="0.5" max="3" step="0.05" bind:value={P_G} onchange={() => onPressureChange('P_G')} />
+            <input id="r-pg" type="range" min="0.5" max="3" step="0.05" bind:value={P_G} style="--pct: {pct(P_G,0.5,3)}%" onchange={() => onPressureChange('P_G')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>FWH terminal temp diff (TTD)</span><span class="slider-value">{TTD} °C</span></div>
@@ -524,8 +554,10 @@
             <svg viewBox="0 0 160 100" class="gauge-svg">
               <path d={gaugeTrack} fill="none" stroke="#e0e4dc" stroke-width="10" />
               <path d={g1Fill} fill="none" stroke="#ef9f27" stroke-width="10" />
-              <line x1={gCx} y1={gCy} x2={g1Needle.x} y2={g1Needle.y} stroke="#c07a10" stroke-width="2.5" stroke-linecap="round" />
-              <circle cx={gCx} cy={gCy} r="5" fill="#c07a10" />
+              <g class="gauge-needle-grp" style="animation-delay: 0s">
+                <line x1={gCx} y1={gCy} x2={g1Needle.x} y2={g1Needle.y} stroke="#c07a10" stroke-width="2.5" stroke-linecap="round" />
+                <circle cx={gCx} cy={gCy} r="5" fill="#c07a10" />
+              </g>
               <text x="20" y="98" class="gauge-tick">0%</text>
               <text x="140" y="98" class="gauge-tick" text-anchor="end">100%</text>
             </svg>
@@ -536,18 +568,52 @@
             <svg viewBox="0 0 160 100" class="gauge-svg">
               <path d={gaugeTrack} fill="none" stroke="#e0e4dc" stroke-width="10" />
               <path d={g2Fill} fill="none" stroke="#5dcaa5" stroke-width="10" />
-              <line x1={gCx} y1={gCy} x2={g2Needle.x} y2={g2Needle.y} stroke="#1a9b73" stroke-width="2.5" stroke-linecap="round" />
-              <circle cx={gCx} cy={gCy} r="5" fill="#1a9b73" />
+              <g class="gauge-needle-grp" style="animation-delay: -0.6s">
+                <line x1={gCx} y1={gCy} x2={g2Needle.x} y2={g2Needle.y} stroke="#1a9b73" stroke-width="2.5" stroke-linecap="round" />
+                <circle cx={gCx} cy={gCy} r="5" fill="#1a9b73" />
+              </g>
               <text x="20" y="98" class="gauge-tick">0%</text>
               <text x="140" y="98" class="gauge-tick" text-anchor="end">100%</text>
             </svg>
             <p class="gauge-value gauge-value-teal">{fmt(Math.min(result.eta_2, 1) * 100, 2)}%</p>
           </div>
+          <div class="gauge-card" class:gauge-card-alarm={g3Warn}>
+            <p class="gauge-label">LP exhaust quality</p>
+            <svg viewBox="0 0 160 100" class="gauge-svg">
+              <path d={gaugeTrack} fill="none" stroke="#e0e4dc" stroke-width="10" />
+              <path d={g3Fill} fill="none" stroke={g3FillColor} stroke-width="10" />
+              <g class="gauge-needle-grp" style="animation-delay: -1.2s">
+                <line x1={gCx} y1={gCy} x2={g3Needle.x} y2={g3Needle.y} stroke={g3AccentColor} stroke-width="2.5" stroke-linecap="round" />
+                <circle cx={gCx} cy={gCy} r="5" fill={g3AccentColor} />
+              </g>
+              <text x="20" y="98" class="gauge-tick">0%</text>
+              <text x="140" y="98" class="gauge-tick" text-anchor="end">100%</text>
+            </svg>
+            {#if result.x5 >= 0}
+              <p class="gauge-value" class:readout-warn={g3Warn} style="color: {g3Warn ? '' : g3AccentColor}">{fmt(result.x5 * 100, 1)}%</p>
+            {:else}
+              <p class="gauge-value" style="color: {g3AccentColor}">S/H</p>
+            {/if}
+          </div>
+          <div class="gauge-card">
+            <p class="gauge-label">Pump power fraction</p>
+            <svg viewBox="0 0 160 100" class="gauge-svg">
+              <path d={gaugeTrack} fill="none" stroke="#e0e4dc" stroke-width="10" />
+              <path d={g4Fill} fill="none" stroke="#c9b8ea" stroke-width="10" />
+              <g class="gauge-needle-grp" style="animation-delay: -1.8s">
+                <line x1={gCx} y1={gCy} x2={g4Needle.x} y2={g4Needle.y} stroke="#6d4fb0" stroke-width="2.5" stroke-linecap="round" />
+                <circle cx={gCx} cy={gCy} r="5" fill="#6d4fb0" />
+              </g>
+              <text x="20" y="98" class="gauge-tick">0%</text>
+              <text x="140" y="98" class="gauge-tick" text-anchor="end">100%</text>
+            </svg>
+            <p class="gauge-value" style="color:#6d4fb0">{fmt(g4Raw * 100, 2)}%</p>
+          </div>
         </div>
 
         <!-- Key readouts -->
         <div class="readout-grid">
-          <div class="readout-card">
+          <div class="readout-card readout-card-hero">
             <p class="readout-label">Net electrical output</p>
             <p class="readout-value readout-value-amber">{fmt(result.W_net / 1e6, 1)} <span class="readout-unit">MW</span></p>
           </div>
@@ -576,12 +642,8 @@
             <p class="readout-value">{fmt(result.Ex_sg / 1e6, 1)} <span class="readout-unit">MW</span></p>
           </div>
           <div class="readout-card">
-            <p class="readout-label">LP exhaust quality</p>
-            {#if result.x5 >= 0}
-              <p class="readout-value" class:readout-warn={result.x5 < 0.85}>{fmt(result.x5 * 100, 1)} <span class="readout-unit">%</span></p>
-            {:else}
-              <p class="readout-value">S/H</p>
-            {/if}
+            <p class="readout-label">Heat rejected (condenser)</p>
+            <p class="readout-value">{fmt(result.flow_cond * (result.h5 - result.h6) / 1e6, 1)} <span class="readout-unit">MW</span></p>
           </div>
         </div>
 
@@ -640,14 +702,25 @@
 
   /* Gauges */
   .gauge-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; max-width: 400px;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px;
+  }
+  @media (max-width: 700px) {
+    .gauge-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .gauge-grid { grid-template-columns: 1fr; }
   }
   .gauge-card {
-    background: #f5f6f4; border: 1px solid #dde1d8; border-radius: 6px; padding: 12px;
+    background: #f5f6f4; border: 1px solid #dde1d8; border-radius: 6px; padding: 10px;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+  .gauge-card-alarm {
+    border-color: #f3a5a5;
+    animation: alarm-ring 1.3s ease-out infinite;
   }
   .gauge-label {
-    font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
-    text-transform: uppercase; color: #6b7566; margin: 0 0 8px;
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.03em; line-height: 1.25;
+    text-transform: uppercase; color: #6b7566; margin: 0 0 6px;
   }
   .gauge-svg { width: 100%; height: auto; display: block; }
   .gauge-tick { font-size: 10px; fill: #8d9686; }
@@ -658,6 +731,18 @@
   .gauge-value-amber { color: #c07a10; }
   .gauge-value-teal  { color: #1a9b73; }
 
+  /* Playful idle wiggle on every gauge needle — purely decorative, staggered per gauge
+     via animation-delay (negative delays start each gauge mid-cycle, out of phase). */
+  .gauge-needle-grp {
+    transform-origin: 80px 85px;
+    animation: needle-jiggle 2.4s ease-in-out infinite;
+  }
+  @keyframes needle-jiggle {
+    0%, 100% { transform: rotate(0deg); }
+    25%      { transform: rotate(-3deg); }
+    75%      { transform: rotate(3deg); }
+  }
+
   /* Accordion slider groups */
   .slider-details {
     border-bottom: 1px solid #dde1d8; margin-bottom: 0;
@@ -665,13 +750,18 @@
   .slider-details:first-of-type { border-top: 1px solid #dde1d8; }
   .details-summary {
     font-size: 11px; font-weight: 600; letter-spacing: 0.07em;
-    text-transform: uppercase; color: #8d9686;
-    padding: 10px 0; cursor: pointer; user-select: none;
+    text-transform: uppercase; color: #6b7566;
+    padding: 10px 8px; margin: 0 -8px; border-radius: 5px;
+    cursor: pointer; user-select: none; transition: background-color 0.15s;
     list-style: none; display: flex; justify-content: space-between; align-items: center;
   }
+  .details-summary:hover { background-color: #f0f2ee; color: #1a1f18; }
   .details-summary::-webkit-details-marker { display: none; }
   .details-summary::after {
-    content: '▶'; font-size: 8px; color: #b0b8a8;
+    content: ''; width: 0; height: 0; flex-shrink: 0;
+    border-style: solid;
+    border-width: 5px 0 5px 7px;
+    border-color: transparent transparent transparent var(--slider-color, #8d9686);
     transition: transform 0.15s ease;
   }
   .slider-details[open] > .details-summary::after { transform: rotate(90deg); }
@@ -694,23 +784,52 @@
 
   /* Readout cards */
   .readout-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; margin-bottom: 14px;
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 6px; margin-top: 12px; margin-bottom: 14px;
+  }
+  @media (max-width: 480px) {
+    .readout-grid { grid-template-columns: repeat(2, 1fr); }
   }
   .readout-card {
-    background: #f5f6f4; border: 1px solid #dde1d8; border-radius: 6px; padding: 10px 12px;
+    background: #f5f6f4; border: 1px solid #dde1d8; border-radius: 6px; padding: 8px 10px;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
   }
   .readout-label {
-    font-size: 11px; font-weight: 500; letter-spacing: 0.04em;
+    font-size: 10.5px; font-weight: 500; letter-spacing: 0.03em; line-height: 1.25;
     color: #6b7566; text-transform: uppercase; margin: 0 0 3px;
   }
   .readout-value {
-    font-size: 18px; font-weight: 600; color: #1a1f18;
-    margin: 0; font-variant-numeric: tabular-nums;
+    font-size: 16px; font-weight: 600; color: #1a1f18;
+    margin: 0; font-variant-numeric: tabular-nums; white-space: nowrap;
   }
   .readout-value-amber { color: #c07a10; }
   .readout-unit { font-size: 11px; font-weight: 400; color: #6b7566; }
-  .readout-warn { color: #dc2626; animation: warn-flash 1s ease-in-out infinite; }
-  @keyframes warn-flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* Hero glow on the headline output card — slow, ambient breathing glow */
+  .readout-card-hero {
+    border-color: #ecc98f;
+    box-shadow: 0 0 0 1px rgba(192, 122, 16, 0.12), 0 0 14px rgba(192, 122, 16, 0.28);
+    animation: hero-glow 2.6s ease-in-out infinite;
+  }
+  @keyframes hero-glow {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(192, 122, 16, 0.12), 0 0 12px rgba(192, 122, 16, 0.22); }
+    50%      { box-shadow: 0 0 0 1px rgba(192, 122, 16, 0.2),  0 0 22px rgba(192, 122, 16, 0.45); }
+  }
+
+  /* Alarm state — radar-style expanding ring on the card + a glowing pulse on the value */
+  @keyframes alarm-ring {
+    0%   { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
+    70%  { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+  }
+  .readout-warn {
+    color: #dc2626;
+    animation: warn-pulse 1.3s ease-in-out infinite;
+  }
+  @keyframes warn-pulse {
+    0%, 100% { text-shadow: 0 0 0 rgba(220, 38, 38, 0); }
+    50%      { text-shadow: 0 0 9px rgba(220, 38, 38, 0.65); }
+  }
 
   /* Extraction table */
   .extraction-wrap { margin-bottom: 12px; }

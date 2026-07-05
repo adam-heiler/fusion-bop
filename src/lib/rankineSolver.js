@@ -636,7 +636,7 @@ export function solveCycle(p) {
     h1, h2, h3, h4, h5, h6, h7,
     h8, h9, h10, h11, h12, h13, h14, h15,
     W_net, W_turb, W_pumps, eta_1, eta_2, x5, Ex_sg,
-    T6C, T_wb, P6,
+    T6C, T_wb, P6, flow_cond,
     statePoints, extractionStatePoints,
     boilerPath, reheatPath, fwPath,
     hpPath, ipPath, lpPath, fwhShellPaths, condenserPath, drainPaths,
