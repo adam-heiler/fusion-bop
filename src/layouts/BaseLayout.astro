@@ -10,12 +10,23 @@ const { title } = Astro.props;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
     <title>{title} | Fusion BOP</title>
   </head>
-  <body class="bg-white text-gray-900 min-h-screen">
+  <body class="min-h-screen">
     <nav class="site-nav">
       <a href="/" class="site-logo">Fusion<span class="logo-bop">BoP</span></a>
-      <div class="nav-links">
+      <span class="beta-badge">
+        <span class="beta-led"></span>Beta
+      </span>
+
+      <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span><span></span>
+      </button>
+
+      <div class="nav-links" id="nav-links">
         <a href="/">Overview</a>
         <a href="/thermo-background">Thermodynamics Background</a>
         <a href="/tokamak-systems">Tokamak Systems</a>
@@ -24,6 +35,7 @@ const { title } = Astro.props;
         <a href="/he-brayton">He Brayton</a>
       </div>
     </nav>
+    <div class="nav-scrim" id="nav-scrim"></div>
     <main class="p-6">
       <slot />
     </main>
@@ -57,33 +69,93 @@ const { title } = Astro.props;
   });
   mo.observe(document.documentElement, { childList: true, subtree: true });
   document.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(attach);
+
+  // Mobile nav: hamburger toggles a slide-in panel, closed by the scrim, a nav
+  // link click, or Escape.
+  const navToggle = document.getElementById('nav-toggle');
+  const navLinks  = document.getElementById('nav-links');
+  const navScrim  = document.getElementById('nav-scrim');
+
+  function setNavOpen(open: boolean) {
+    navLinks?.classList.toggle('open', open);
+    navScrim?.classList.toggle('open', open);
+    navToggle?.setAttribute('aria-expanded', String(open));
+    document.body.classList.toggle('nav-lock', open);
+  }
+
+  navToggle?.addEventListener('click', () => {
+    setNavOpen(!navLinks?.classList.contains('open'));
+  });
+  navScrim?.addEventListener('click', () => setNavOpen(false));
+  navLinks?.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setNavOpen(false)));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') setNavOpen(false); });
 </script>
 
 <style is:global>
   .site-nav {
+    position: relative;
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
-    padding: 0.5rem 1.25rem;
-    border-bottom: 1px solid #e5e7eb;
-    min-height: 52px;
-    row-gap: 0.25rem;
+    padding: 0.55rem 1.5rem;
+    min-height: 54px;
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 40%),
+      linear-gradient(180deg, var(--steel-650), var(--steel-800)),
+      var(--aluminum);
+    background-repeat: no-repeat, no-repeat, repeat;
+    background-size: 100% 100%, 100% 100%, 700px auto;
+    background-blend-mode: normal, overlay, normal;
+    border-bottom: 1px solid var(--hairline);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
   }
 
   .site-nav .site-logo {
-    font-size: 1.1rem;
+    font-family: var(--font-display);
+    font-size: 1.25rem;
     font-weight: 700;
-    letter-spacing: -0.02em;
-    color: #1a1f18;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--paper);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
     text-decoration: none;
-    margin-right: 1.75rem;
+    margin-right: 0.75rem;
     white-space: nowrap;
     transition: opacity 0.15s;
   }
   .site-nav .site-logo:hover  { opacity: 0.7; }
   .site-nav .site-logo:active { opacity: 0.45; transform: translateY(1px); }
 
-  .site-nav .logo-bop { color: #14b8a6; }
+  .site-nav .logo-bop { color: var(--teal-dim); }
+
+  .beta-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--amber);
+    background: linear-gradient(180deg, #17140c, #0e0c08);
+    border: 1px solid #000;
+    border-radius: 999px;
+    padding: 0.2rem 0.6rem 0.2rem 0.45rem;
+    margin-right: 1.25rem;
+    white-space: nowrap;
+    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.8);
+  }
+  .beta-led {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 5px 1.5px var(--amber);
+    animation: led-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes led-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+  }
 
   .site-nav .nav-links {
     display: flex;
@@ -96,9 +168,10 @@ const { title } = Astro.props;
     display: inline-flex;
     align-items: center;
     padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #4a5244;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--ink);
     text-decoration: none;
     white-space: nowrap;
     transition: color 0.2s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
@@ -112,22 +185,95 @@ const { title } = Astro.props;
     left: 0.75rem;
     right: 0.75rem;
     height: 2px;
-    background: #14b8a6;
+    background: var(--teal);
     transform: scaleX(0);
     transform-origin: left;
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* No overshoot here (unlike the lift bounce above) - an overshooting scaleX on a
+       short link like "Overview" pushes the bar past its own edge and visibly smears
+       into the next link before settling back, reading as a rendering glitch. */
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
     border-radius: 1px 1px 0 0;
   }
 
   .site-nav .nav-links a:hover {
-    color: #1a1f18;
+    color: var(--paper);
     transform: translateY(-2px);
-    text-shadow: 0 0 12px rgba(20, 184, 166, 0.35);
   }
   .site-nav .nav-links a:hover::after { transform: scaleX(1); }
   .site-nav .nav-links a:active {
-    color: #14b8a6;
+    color: var(--teal);
     transform: translateY(0) scale(0.96);
     transition: color 0.1s ease, transform 0.1s ease;
+  }
+
+  /* Hamburger toggle - hidden above the breakpoint, replaces nav-link wrapping below it */
+  .nav-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 32px;
+    height: 32px;
+    margin-left: auto;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .nav-toggle span {
+    display: block;
+    width: 100%;
+    height: 2px;
+    background: var(--paper);
+    border-radius: 1px;
+    transition: transform 0.25s ease, opacity 0.2s ease;
+  }
+  .nav-toggle[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .nav-toggle[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+  .nav-toggle[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  .nav-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 40;
+  }
+  .nav-scrim.open { opacity: 1; pointer-events: auto; }
+
+  body.nav-lock { overflow: hidden; }
+
+  @media (max-width: 900px) {
+    .site-nav .nav-links {
+      position: fixed;
+      top: 0;
+      right: 0;
+      height: 100vh;
+      width: min(280px, 80vw);
+      background: linear-gradient(165deg, var(--steel-650), var(--steel-900));
+      border-left: 1px solid var(--hairline);
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      gap: 0.25rem;
+      padding: 4.5rem 1.25rem 1.5rem;
+      box-shadow: -8px 0 28px rgba(0, 0, 0, 0.5);
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 50;
+      overflow-y: auto;
+    }
+    .site-nav .nav-links.open { transform: translateX(0); }
+    .site-nav .nav-links a { width: 100%; }
+    .site-nav .nav-links a::after { display: none; }
+    .site-nav .nav-links a:hover {
+      background: rgba(0, 0, 0, 0.06);
+      border-radius: 6px;
+      transform: none;
+    }
+    .nav-toggle { display: flex; }
   }
 </style>

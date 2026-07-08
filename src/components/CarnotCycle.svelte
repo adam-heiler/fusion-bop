@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Gauge from './Gauge.svelte';
   // Carnot cycle interactive explainer
   // 1st law efficiency: eta_th = 1 - Tc/Th
   //   Source: Moran, Shapiro, Boettner & Bailey, "Fundamentals of Engineering
@@ -7,7 +8,7 @@
   // 2nd law (exergetic) efficiency: eta_II = W_net / Ex_in
   //   Source: Moran et al., Ch. 7 (Exergy Analysis), eta_II = Wdot / Exdot_heat.
   //   For a Carnot engine this is identically 100% because the cycle is fully
-  //   reversible (zero exergy destruction) — that's why it's the reference
+  //   reversible (zero exergy destruction) - that's why it's the reference
   //   cycle for 2nd law comparisons (Cengel & Boles, "Thermodynamics: An
   //   Engineering Approach," Ch. 8).
   // Exergy of heat input: Ex_in = Q_H * (1 - T0/T_H), with T0 = T_C
@@ -33,41 +34,6 @@
   const W = $derived(QH * eta1); // net work output, kJ
   const exIn = $derived(QH * (1 - TC / TH)); // exergy in, kJ (T0 = TC)
   const deltaT = $derived(TH - TC); // temperature difference, K
-
-  // --- Gauge geometry ---
-  // Semicircular gauge, 0% at the LEFT (180deg), 100% at the RIGHT (0deg),
-  // sweeping over the TOP. Verified independently against landmark points
-  // (0% -> left, 50% -> top, 100% -> right) before being written in here.
-  const gaugeCx = 80, gaugeCy = 85, gaugeR = 60;
-
-  function angleForFraction(frac: number) {
-    return 180 - frac * 180;
-  }
-
-  function polarPoint(angleDeg: number, radius: number) {
-    const rad = (angleDeg * Math.PI) / 180;
-    return {
-      x: gaugeCx + radius * Math.cos(rad),
-      y: gaugeCy - radius * Math.sin(rad)
-    };
-  }
-
-  function arcPath(fromFrac: number, toFrac: number, radius: number) {
-    const a0 = angleForFraction(fromFrac);
-    const a1 = angleForFraction(toFrac);
-    const p0 = polarPoint(a0, radius);
-    const p1 = polarPoint(a1, radius);
-    const sweep = toFrac > fromFrac ? 1 : 0;
-    return `M ${p0.x} ${p0.y} A ${radius} ${radius} 0 0 ${sweep} ${p1.x} ${p1.y}`;
-  }
-
-  const gauge1TrackPath = arcPath(0, 1, gaugeR);
-  const gauge1FillPath = $derived(arcPath(0, eta1, gaugeR));
-  const gauge1NeedleTip = $derived(polarPoint(angleForFraction(eta1), gaugeR - 12));
-
-  const gauge2TrackPath = arcPath(0, 1, gaugeR);
-  const gauge2FillPath = arcPath(0, 1, gaugeR); // always full, eta2 is always 1
-  const gauge2NeedleTip = polarPoint(angleForFraction(1), gaugeR - 12); // always far right
 
   // --- T-s diagram geometry ---
   const padL = 50, padR = 300, padT = 20, padB = 220;
@@ -125,47 +91,38 @@
     </div>
 
     <div class="gauge-grid">
-      <div class="gauge-card">
-        <p class="gauge-label">1st law efficiency</p>
-        <svg viewBox="0 0 160 100" class="gauge-svg">
-          <path d={gauge1TrackPath} fill="none" stroke="#e0e4dc" stroke-width="10" />
-          <path d={gauge1FillPath} fill="none" stroke="#ef9f27" stroke-width="10" />
-          <line x1={gaugeCx} y1={gaugeCy} x2={gauge1NeedleTip.x} y2={gauge1NeedleTip.y} stroke="#c07a10" stroke-width="2.5" stroke-linecap="round" />
-          <circle cx={gaugeCx} cy={gaugeCy} r="5" fill="#c07a10" />
-          <text x="20" y="98" class="gauge-tick">0%</text>
-          <text x="140" y="98" class="gauge-tick gauge-tick-end">100%</text>
-        </svg>
-        <p class="gauge-value gauge-value-amber">{fmt(eta1 * 100, 1)}%</p>
-      </div>
-
-      <div class="gauge-card">
-        <p class="gauge-label">2nd law efficiency</p>
-        <svg viewBox="0 0 160 100" class="gauge-svg">
-          <path d={gauge2TrackPath} fill="none" stroke="#e0e4dc" stroke-width="10" />
-          <path d={gauge2FillPath} fill="none" stroke="#5dcaa5" stroke-width="10" />
-          <line x1={gaugeCx} y1={gaugeCy} x2={gauge2NeedleTip.x} y2={gauge2NeedleTip.y} stroke="#1a9b73" stroke-width="2.5" stroke-linecap="round" />
-          <circle cx={gaugeCx} cy={gaugeCy} r="5" fill="#1a9b73" />
-          <text x="20" y="98" class="gauge-tick">0%</text>
-          <text x="140" y="98" class="gauge-tick gauge-tick-end">100%</text>
-        </svg>
-        <p class="gauge-value gauge-value-teal">{fmt(eta2 * 100, 0)}%</p>
-      </div>
+      <Gauge
+        label="1st law efficiency"
+        value={eta1}
+        valueText={fmt(eta1 * 100, 1)}
+        unit="%"
+        accent="#f2ac41"
+        accentDim="#c07a10"
+      />
+      <Gauge
+        label="2nd law efficiency"
+        value={eta2}
+        valueText={fmt(eta2 * 100, 0)}
+        unit="%"
+        accent="#35d6b4"
+        accentDim="#14b8a6"
+      />
     </div>
 
     <div class="readout-grid">
-      <div class="readout-card">
+      <div class="readout-card chamfer-panel chamfer-sm">
         <p class="readout-label">Heat in, Q<sub>H</sub></p>
         <p class="readout-value">{fmt(QH, 0)} <span class="readout-unit">kJ</span></p>
       </div>
-      <div class="readout-card">
+      <div class="readout-card chamfer-panel chamfer-sm">
         <p class="readout-label">Work out, W<sub>net</sub></p>
         <p class="readout-value">{fmt(W, 1)} <span class="readout-unit">kJ</span></p>
       </div>
-      <div class="readout-card">
+      <div class="readout-card chamfer-panel chamfer-sm">
         <p class="readout-label">&Delta;T (T<sub>H</sub> &minus; T<sub>C</sub>)</p>
         <p class="readout-value">{fmt(deltaT, 0)} <span class="readout-unit">K</span></p>
       </div>
-      <div class="readout-card">
+      <div class="readout-card chamfer-panel chamfer-sm">
         <p class="readout-label">Exergy in, Ex<sub>H</sub></p>
         <p class="readout-value">{fmt(exIn, 1)} <span class="readout-unit">kJ</span></p>
         <p class="exergy-note">Ref. environment: T<sub>0</sub> = T<sub>C</sub></p>
@@ -174,6 +131,8 @@
   </div>
 
   <div class="diagram-col">
+    <p class="panel-title">Temperature&ndash;Entropy Diagram</p>
+    <div class="diagram-panel chamfer-panel">
     <svg
       viewBox="0 0 320 250"
       class="ts-svg"
@@ -214,6 +173,7 @@
         at T<sub>C</sub>. Left edge (4&rarr;1): reversible adiabatic compression.
       </p>
     </div>
+    </div>
   </div>
 </div>
 
@@ -234,7 +194,16 @@
 
   .controls-col,
   .diagram-col {
-    font-family: var(--font-sans, system-ui, sans-serif);
+    font-family: var(--font-display);
+  }
+
+  .panel-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin: 0 0 8px;
   }
 
   .slider-row {
@@ -250,14 +219,15 @@
 
   .slider-label label {
     font-size: 14px;
-    font-weight: 500;
-    color: #4a5244;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--ink);
   }
 
   .slider-value {
-    font-size: 14px;
-    font-weight: 600;
-    color: #1a1f18;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 400;
   }
 
   .th-slider { --slider-color: #e8935f; }
@@ -266,98 +236,53 @@
   .gauge-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-top: 1rem;
-  }
-
-  .gauge-card {
-    background: #f5f6f4;
-    border: 1px solid #dde1d8;
-    border-radius: 6px;
-    padding: 14px;
-  }
-
-  .gauge-label {
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    color: #6b7566;
-    margin: 0 0 10px;
-    text-transform: uppercase;
-  }
-
-  .gauge-svg {
-    width: 100%;
-    height: auto;
-    display: block;
-  }
-
-  .gauge-tick {
-    font-size: 10px;
-    fill: #8d9686;
-  }
-
-  .gauge-tick-end {
-    text-anchor: end;
-  }
-
-  .gauge-value {
-    text-align: center;
-    font-size: 22px;
-    font-weight: 600;
-    margin: 4px 0 0;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .gauge-value-amber {
-    color: #c07a10;
-  }
-
-  .gauge-value-teal {
-    color: #1a9b73;
+    gap: 14px;
+    margin-top: 1.25rem;
   }
 
   .readout-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
-    margin-top: 12px;
+    margin-top: 16px;
   }
 
   .readout-card {
-    background: #f5f6f4;
-    border: 1px solid #dde1d8;
-    border-radius: 6px;
     padding: 10px 12px;
   }
 
   .readout-label {
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 0.03em;
-    color: #6b7566;
-    margin: 0 0 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--ink-dim);
+    margin: 0 0 5px;
     text-transform: uppercase;
   }
 
   .readout-value {
     font-size: 18px;
-    font-weight: 600;
-    color: #1a1f18;
+    font-weight: 400;
+    color: var(--paper);
     margin: 0;
     font-variant-numeric: tabular-nums;
   }
 
   .readout-unit {
-    font-size: 12px;
-    color: #6b7566;
-    font-weight: 400;
+    font-family: var(--font-display);
+    font-size: 11px;
+    color: var(--ink-dim);
+    font-weight: 500;
   }
 
   .exergy-note {
     font-size: 11px;
-    color: #8d9686;
+    color: var(--ink-dim);
     margin: 6px 0 0;
+  }
+
+  .diagram-panel {
+    padding: 16px;
   }
 
   .ts-svg {
@@ -368,69 +293,76 @@
   }
 
   .axis {
-    stroke: #9ca89a;
+    stroke: var(--steel-900);
     stroke-width: 1;
   }
 
   .axis-text {
-    font-size: 13px;
-    fill: #6b7566;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    fill: var(--ink-dim);
   }
 
   .ref-line {
-    stroke: #c0c8bc;
+    stroke: var(--steel-800);
     stroke-width: 1;
     stroke-dasharray: 3, 3;
   }
 
   .ref-text {
-    font-size: 14px;
-    font-weight: 600;
-    fill: #2a2f26;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 400;
+    fill: var(--ink);
   }
 
   .cycle-fill {
     fill: #378add;
-    fill-opacity: 0.15;
-    stroke: #5ba3e8;
+    fill-opacity: 0.18;
+    stroke: var(--blue);
     stroke-width: 1.5;
   }
 
   .edge-hot {
-    stroke: #e8935f;
-    stroke-width: 2.5;
+    stroke: var(--amber);
+    stroke-width: 2.75;
+    filter: drop-shadow(0 0 3px rgba(242, 172, 65, 0.5));
   }
 
   .edge-cold {
-    stroke: #5ba3e8;
-    stroke-width: 2.5;
+    stroke: var(--blue);
+    stroke-width: 2.75;
+    filter: drop-shadow(0 0 3px rgba(111, 178, 238, 0.5));
   }
 
   .edge-adiabat {
-    stroke: #9ca89a;
+    stroke: var(--steel-800);
     stroke-width: 1.5;
     stroke-dasharray: 4, 3;
   }
 
   .point {
-    fill: #2563eb;
+    fill: var(--paper);
+    stroke: #000;
+    stroke-width: 0.5;
   }
 
   .point-text {
+    font-family: var(--font-mono);
     font-size: 12px;
-    font-weight: 500;
-    fill: #1a1f18;
+    font-weight: 400;
+    fill: var(--paper);
   }
 
   .caption-wrap {
     padding-left: 15.62%;
     padding-right: 6.25%;
-    margin-top: 6px;
+    margin-top: 10px;
   }
 
   .caption {
     font-size: 13px;
-    color: #6b7566;
+    color: var(--ink-dim);
     margin: 0;
     line-height: 1.5;
   }

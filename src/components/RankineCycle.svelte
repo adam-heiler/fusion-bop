@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { init, solveCycle, getDome, minPC as solverMinPC, minPG as solverMinPG } from '../lib/rankineSolver.js';
+  import Gauge from './Gauge.svelte';
 
   // -- Slider state -----------------------------------------------------------
   let P1            = $state(250);
@@ -26,7 +27,13 @@
   let T0          = $state(25);
   let RH          = $state(50);
   let cw_approach = $state(3.1);
-  let cond_TTD    = $state(2.8);
+  // Level-3 circulating-water inputs (replace the old fixed cond_TTD slider):
+  //   r_cw = circulating-water : steam mass-flow ratio (sets ṁ_cw = r_cw · ṁ_steam)
+  //   UA   = condenser conductance (MW/K), the held physical size of the condenser.
+  // The condenser terminal difference (TTD) and CW temperature rise (range) are now
+  // EMERGENT outputs of the ε-NTU model, not inputs.
+  let r_cw        = $state(23);
+  let UA          = $state(80.9);
 
   const FIXED = {
     P_condpump: 5, P_feedpump: 250, subcool: 2.8,
@@ -36,7 +43,7 @@
   const isSupercritical = $derived(P1 >= PCRIT);
 
   // ── Pressure ordering enforcement ───────────────────────────────────────────
-  // Required chain (boiler -> condenser): P1 > P_VA > P_B > P2 > P_C > P_D > P4 > P_E >
+  // Required chain (steam generator -> condenser): P1 > P_VA > P_B > P2 > P_C > P_D > P4 > P_E >
   // P_F > P_G. Each pressure is a heater/turbine-bleed point along the expansion path; if
   // this ordering is violated the cycle is not physically meaningful (e.g. a "later"
   // feedwater heater would need to heat the feedwater to a LOWER temperature than an
@@ -49,7 +56,7 @@
   // has the SAME terminal temperature difference (TTD) subtracted on both sides, so it
   // cancels out and pure pressure ordering is sufficient there. But the deaerator and
   // condenser outlets are saturated liquid with NO TTD subtracted (they're direct-contact/
-  // phase-change vessels, not TTD-rated heat exchangers) — so FWH4 (against the deaerator)
+  // phase-change vessels, not TTD-rated heat exchangers) - so FWH4 (against the deaerator)
   // and FWH1 (against the condenser) each need an EXTRA temperature margin worth of
   // pressure headroom that grows with the TTD slider. Get this wrong and the corresponding
   // extraction fraction (c or g) goes negative, which is unphysical (steam flowing
@@ -74,9 +81,13 @@
   }
 
   // Minimum P_G such that FWH1's TTD-determined feedwater outlet stays above what the
-  // condenser + condensate pump already delivers. Same numeric approach.
+  // condenser + condensate pump already delivers. Under the Level-3 ε-NTU condenser the
+  // condenser saturation temperature is emergent, so we feed the clamp the most recent
+  // solved T6C (result.T6C - one drag-step stale, an excellent estimate since sliders move
+  // incrementally). On first load, before any solve, fall back to a nominal estimate.
   function minPG(): number {
-    return solverMinPG(T0, RH, cw_approach, cond_TTD, TTD, eta_pump);
+    const T6C_est = result ? result.T6C : (25 + cw_approach + 13);
+    return solverMinPG(T6C_est, TTD, eta_pump);
   }
 
   function enforceOrder(changed: string) {
@@ -151,17 +162,17 @@
       P1, T1, T3, P2, P4, reheat_dP_pct, P_VA,
       P_B, P_C, P_D, P_E, P_F, P_G, Q,
       eta_HP, eta_IP, eta_LP, eta_pump, eta_gen, TTD,
-      T0, RH, cw_approach, cond_TTD,
+      T0, RH, cw_approach, r_cw, UA: UA * 1e6,   // UA slider is MW/K -> W/K for the solver
       ...FIXED,
     };
   }
 
   // ── Extraction / drain state visibility ──────────────────────────────────────
-  // X1 = extraction steam (on turbine line) — checked by default.
-  // X2 = shell drain subcooled liquid — unchecked by default.
-  // X3 = drain after booster pump — unchecked by default.
+  // X1 = extraction steam (on turbine line) - checked by default.
+  // X2 = shell drain subcooled liquid - unchecked by default.
+  // X3 = drain after booster pump - unchecked by default.
   let showExtraction: Record<string, boolean> = $state({
-    A1: true, A2: true, A3: true,
+    A1: true, A2: true, A3: true, A4: true, A5: true,
     B1: true, B2: true, B3: true,
     C1: true, C2: true, C3: true,
     D1: true,
@@ -179,7 +190,7 @@
   function runSolve() {
     // Deferred as a macrotask (not requestAnimationFrame, which runs *before* the
     // browser's next paint) so the released slider thumb actually gets painted before
-    // the CoolProp solve blocks the main thread — otherwise the thumb stays visually
+    // the CoolProp solve blocks the main thread - otherwise the thumb stays visually
     // "stuck" enlarged for the whole calculation, since no repaint can happen mid-block.
     setTimeout(() => {
       try {
@@ -203,45 +214,21 @@
     runSolve();
   });
 
-  // ── Gauge geometry (mirrors CarnotCycle.svelte exactly) ───────────────────────
-  const gCx = 80, gCy = 85, gR = 60;
+  // ── Gauge value logic (geometry now lives in the shared Gauge.svelte) ───────
+  const g1Val = $derived(result ? result.eta_1 : 0);
+  const g2Val = $derived(result ? Math.min(result.eta_2, 1) : 0);
 
-  function angleForFraction(frac: number) { return 180 - frac * 180; }
-
-  function polarPoint(deg: number, r: number) {
-    const rad = deg * Math.PI / 180;
-    return { x: gCx + r * Math.cos(rad), y: gCy - r * Math.sin(rad) };
-  }
-
-  function arcPath(f0: number, f1: number, r: number) {
-    const a0 = angleForFraction(f0), a1 = angleForFraction(f1);
-    const p0 = polarPoint(a0, r), p1 = polarPoint(a1, r);
-    return `M ${p0.x} ${p0.y} A ${r} ${r} 0 0 ${f1 > f0 ? 1 : 0} ${p1.x} ${p1.y}`;
-  }
-
-  const gaugeTrack = arcPath(0, 1, gR);
-
-  // Pre-compute gauge fill arcs and needle tips reactively
-  const g1Fill   = $derived(result ? arcPath(0, result.eta_1, gR) : '');
-  const g1Needle = $derived(result ? polarPoint(angleForFraction(result.eta_1), gR - 12) : { x: gCx, y: gCy });
-  const g2Fill   = $derived(result ? arcPath(0, Math.min(result.eta_2, 1), gR) : '');
-  const g2Needle = $derived(result ? polarPoint(angleForFraction(Math.min(result.eta_2, 1)), gR - 12) : { x: gCx, y: gCy });
-
-  // LP exhaust quality gauge — x5 < 0 is the superheated sentinel (no moisture at all,
+  // LP exhaust quality gauge - x5 < 0 is the superheated sentinel (no moisture at all,
   // treated as a full/best-case reading); otherwise fraction is the steam quality itself.
   const g3Frac   = $derived(result ? (result.x5 >= 0 ? result.x5 : 1) : 0);
-  const g3Fill   = $derived(result ? arcPath(0, g3Frac, gR) : '');
-  const g3Needle = $derived(result ? polarPoint(angleForFraction(g3Frac), gR - 12) : { x: gCx, y: gCy });
   const g3Warn   = $derived(!!result && result.x5 >= 0 && result.x5 < 0.85);
-  const g3FillColor   = $derived(g3Warn ? '#f3a5a5' : '#8fc1ea');
-  const g3AccentColor = $derived(g3Warn ? '#dc2626' : '#2f6fa8');
+  const g3Accent    = $derived(g3Warn ? '#ff6459' : '#6fb2ee');
+  const g3AccentDim = $derived(g3Warn ? '#c0392b' : '#2f6fa8');
 
   // Pump power fraction (W_pumps / W_turb), on the full 0-100% scale like the other
-  // gauges — deliberately, since the whole point is to show just how small the parasitic
+  // gauges - deliberately, since the whole point is to show just how small the parasitic
   // pump load is relative to the turbine's gross output.
   const g4Raw    = $derived(result ? result.W_pumps / result.W_turb : 0);
-  const g4Fill   = $derived(result ? arcPath(0, g4Raw, gR) : '');
-  const g4Needle = $derived(result ? polarPoint(angleForFraction(g4Raw), gR - 12) : { x: gCx, y: gCy });
 
   // ── T-s diagram geometry ──────────────────────────────────────────────────────
   const SVG_W = 500, SVG_H = 370;
@@ -276,12 +263,12 @@
 
 <div class="rankine-wrap">
   {#if loading}
-    <div class="loading-state">
+    <div class="loading-state chamfer-panel">
       <div class="loading-spinner"></div>
       <p>Initializing CoolProp WASM…</p>
     </div>
   {:else if errMsg}
-    <div class="error-banner">Solver error: {errMsg}</div>
+    <div class="error-banner chamfer-panel chamfer-sm">Solver error: {errMsg}</div>
   {:else}
     <!-- ── Page title ────────────────────────────────────────────────────────── -->
     <h1 class="page-title" style="grid-column: 1 / -1;">
@@ -292,19 +279,19 @@
     <div class="controls-col">
 
       {#if orderWarning}
-        <div class="order-warning">{orderWarning}</div>
+        <div class="order-warning chamfer-panel chamfer-sm">{orderWarning}</div>
       {/if}
 
-      <!-- Steam conditions (open by default, boiler-orange sliders) -->
-      <details class="slider-details" style="--slider-color: #e8935f" open>
+      <!-- Steam conditions (open by default, steam-generator-orange sliders) -->
+      <details class="slider-details chamfer-panel chamfer-sm" style="--slider-color: #e8935f" open>
         <summary class="details-summary">Steam conditions</summary>
         <div class="slider-body">
           <div class="slider-row">
-            <div class="slider-label"><span>Boiler outlet P₁</span><span class="slider-value">{P1} bar</span></div>
+            <div class="slider-label"><span>Steam generator outlet P₁</span><span class="slider-value">{P1} bar</span></div>
             <input id="r-p1" type="range" min="30" max="300" step="1" bind:value={P1} style="--pct: {pct(P1,30,300)}%" onchange={() => onPressureChange('P1')} />
           </div>
           <div class="slider-row">
-            <div class="slider-label"><span>Boiler outlet T₁</span><span class="slider-value">{T1} °C</span></div>
+            <div class="slider-label"><span>Steam generator outlet T₁</span><span class="slider-value">{T1} °C</span></div>
             <input id="r-t1" type="range" min="480" max="600" step="5" bind:value={T1} onchange={runSolve} />
           </div>
           <div class="slider-row">
@@ -335,7 +322,7 @@
       </details>
 
       <!-- Extraction pressures and feedwater heating (feedwater-teal sliders) -->
-      <details class="slider-details" style="--slider-color: #1a9b73">
+      <details class="slider-details chamfer-panel chamfer-sm" style="--slider-color: #1a9b73">
         <summary class="details-summary">Extraction pressures and feedwater heating</summary>
         <div class="slider-body">
           <div class="slider-row">
@@ -370,7 +357,7 @@
       </details>
 
       <!-- Isentropic efficiencies (turbine-gray sliders) -->
-      <details class="slider-details" style="--slider-color: #6b7566">
+      <details class="slider-details chamfer-panel chamfer-sm" style="--slider-color: #6b7566">
         <summary class="details-summary">Isentropic efficiencies</summary>
         <div class="slider-body">
           <div class="slider-row">
@@ -397,7 +384,7 @@
       </details>
 
       <!-- Cooling / environment (condenser-blue sliders) -->
-      <details class="slider-details" style="--slider-color: #5ba3e8">
+      <details class="slider-details chamfer-panel chamfer-sm" style="--slider-color: #5ba3e8">
         <summary class="details-summary">Cooling / environment</summary>
         <div class="slider-body">
           <div class="slider-row">
@@ -413,15 +400,26 @@
             <input id="r-cwa" type="range" min="2" max="15" step="0.1" bind:value={cw_approach} onchange={runSolve} />
           </div>
           <div class="slider-row">
-            <div class="slider-label"><span>Condenser TTD</span><span class="slider-value">{cond_TTD} °C</span></div>
-            <input id="r-cttd" type="range" min="0" max="10" step="0.1" bind:value={cond_TTD} onchange={runSolve} />
+            <div class="slider-label"><span>CW : steam mass ratio</span><span class="slider-value">{r_cw} : 1</span></div>
+            <input id="r-rcw" type="range" min="10" max="70" step="1" bind:value={r_cw} onchange={runSolve} />
           </div>
+          <div class="slider-row">
+            <div class="slider-label"><span>Condenser conductance UA</span><span class="slider-value">{UA} MW/K</span></div>
+            <input id="r-ua" type="range" min="30" max="200" step="1" bind:value={UA} onchange={runSolve} />
+          </div>
+          {#if result}
+            <p class="cond-helper">
+              ε-NTU condenser: NTU {fmt(result.NTU_cond, 2)} · ε {fmt(result.eps_cond, 3)} ·
+              range {fmt(result.cond_range, 1)} °C · TTD {fmt(result.cond_TTD_eff, 1)} °C
+              (both emergent)
+            </p>
+          {/if}
         </div>
       </details>
 
       <!-- State visibility (extraction and drain states) -->
       {#if result}
-        <details class="slider-details">
+        <details class="slider-details chamfer-panel chamfer-sm">
           <summary class="details-summary">State visibility</summary>
           <div class="slider-body">
             <p class="selection-hint">
@@ -455,6 +453,7 @@
     <div class="diagram-col">
       <p class="diagram-title">Temperature-Entropy (T-s) Diagram</p>
 
+      <div class="scope-panel chamfer-panel">
       <svg viewBox="0 0 {SVG_W} {SVG_H}" class="ts-svg" role="img"
            aria-label="T-s diagram of the supercritical reheat regenerative Rankine cycle">
 
@@ -486,10 +485,10 @@
           <!-- Feedwater train: state 6 through state 15 (v2 numbering) -->
           <path d={pathD(r.fwPath)} class="path-fw" />
 
-          <!-- Boiler: state 15 to state 1 -->
-          <path d={pathD(r.boilerPath)} class="path-boiler" />
+          <!-- Steam generator: state 15 to state 1 -->
+          <path d={pathD(r.steamGenPath)} class="path-steam-gen" />
 
-          <!-- HP turbine: 1 → A → B → 2 -->
+          <!-- HP turbine: 1 → B → 2 -->
           <path d={pathD(r.hpPath)} class="path-expand" />
 
           <!-- Reheater: 2 → 3 -->
@@ -511,7 +510,7 @@
             <line x1={sx(fp.sg)} y1={ty(fp.Tsat)} x2={sx(fp.sf)} y2={ty(fp.Tsat)} class="path-shell" />
           {/each}
 
-          <!-- Drain paths: pump compressions (A2-A3, B2-B3, F2-F3) and valve drops (C2-C3, E2-E3, G2-G3) -->
+          <!-- Drain paths: pump compressions (A4-A5, B2-B3, F2-F3) and valve drops (C2-C3, E2-E3, G2-G3) -->
           {#each r.drainPaths as dp}
             <path d={pathD(dp)} class="path-drain" />
           {/each}
@@ -536,7 +535,7 @@
       </svg>
 
       <div class="diagram-legend">
-        <span class="leg leg-boiler">Boiler</span>
+        <span class="leg leg-steam-gen">Steam generator</span>
         <span class="leg leg-reheat">Reheater</span>
         <span class="leg leg-expand">Turbines</span>
         <span class="leg leg-cond">Condenser</span>
@@ -545,110 +544,101 @@
         <span class="leg leg-drain">Drains</span>
         <span class="leg leg-dome">Sat. dome</span>
       </div>
+      </div>
 
       <!-- Efficiency gauges + indicators -->
       {#if result}
         <div class="gauge-grid">
-          <div class="gauge-card">
-            <p class="gauge-label">1st law efficiency</p>
-            <svg viewBox="0 0 160 100" class="gauge-svg">
-              <path d={gaugeTrack} fill="none" stroke="#e0e4dc" stroke-width="10" />
-              <path d={g1Fill} fill="none" stroke="#ef9f27" stroke-width="10" />
-              <g class="gauge-needle-grp" style="animation-delay: 0s">
-                <line x1={gCx} y1={gCy} x2={g1Needle.x} y2={g1Needle.y} stroke="#c07a10" stroke-width="2.5" stroke-linecap="round" />
-                <circle cx={gCx} cy={gCy} r="5" fill="#c07a10" />
-              </g>
-              <text x="20" y="98" class="gauge-tick">0%</text>
-              <text x="140" y="98" class="gauge-tick" text-anchor="end">100%</text>
-            </svg>
-            <p class="gauge-value gauge-value-amber">{fmt(result.eta_1 * 100, 2)}%</p>
-          </div>
-          <div class="gauge-card">
-            <p class="gauge-label">2nd law efficiency</p>
-            <svg viewBox="0 0 160 100" class="gauge-svg">
-              <path d={gaugeTrack} fill="none" stroke="#e0e4dc" stroke-width="10" />
-              <path d={g2Fill} fill="none" stroke="#5dcaa5" stroke-width="10" />
-              <g class="gauge-needle-grp" style="animation-delay: -0.6s">
-                <line x1={gCx} y1={gCy} x2={g2Needle.x} y2={g2Needle.y} stroke="#1a9b73" stroke-width="2.5" stroke-linecap="round" />
-                <circle cx={gCx} cy={gCy} r="5" fill="#1a9b73" />
-              </g>
-              <text x="20" y="98" class="gauge-tick">0%</text>
-              <text x="140" y="98" class="gauge-tick" text-anchor="end">100%</text>
-            </svg>
-            <p class="gauge-value gauge-value-teal">{fmt(Math.min(result.eta_2, 1) * 100, 2)}%</p>
-          </div>
-          <div class="gauge-card" class:gauge-card-alarm={g3Warn}>
-            <p class="gauge-label">LP exhaust quality</p>
-            <svg viewBox="0 0 160 100" class="gauge-svg">
-              <path d={gaugeTrack} fill="none" stroke="#e0e4dc" stroke-width="10" />
-              <path d={g3Fill} fill="none" stroke={g3FillColor} stroke-width="10" />
-              <g class="gauge-needle-grp" style="animation-delay: -1.2s">
-                <line x1={gCx} y1={gCy} x2={g3Needle.x} y2={g3Needle.y} stroke={g3AccentColor} stroke-width="2.5" stroke-linecap="round" />
-                <circle cx={gCx} cy={gCy} r="5" fill={g3AccentColor} />
-              </g>
-              <text x="20" y="98" class="gauge-tick">0%</text>
-              <text x="140" y="98" class="gauge-tick" text-anchor="end">100%</text>
-            </svg>
-            {#if result.x5 >= 0}
-              <p class="gauge-value" class:readout-warn={g3Warn} style="color: {g3Warn ? '' : g3AccentColor}">{fmt(result.x5 * 100, 1)}%</p>
-            {:else}
-              <p class="gauge-value" style="color: {g3AccentColor}">S/H</p>
-            {/if}
-          </div>
-          <div class="gauge-card">
-            <p class="gauge-label">Pump power fraction</p>
-            <svg viewBox="0 0 160 100" class="gauge-svg">
-              <path d={gaugeTrack} fill="none" stroke="#e0e4dc" stroke-width="10" />
-              <path d={g4Fill} fill="none" stroke="#c9b8ea" stroke-width="10" />
-              <g class="gauge-needle-grp" style="animation-delay: -1.8s">
-                <line x1={gCx} y1={gCy} x2={g4Needle.x} y2={g4Needle.y} stroke="#6d4fb0" stroke-width="2.5" stroke-linecap="round" />
-                <circle cx={gCx} cy={gCy} r="5" fill="#6d4fb0" />
-              </g>
-              <text x="20" y="98" class="gauge-tick">0%</text>
-              <text x="140" y="98" class="gauge-tick" text-anchor="end">100%</text>
-            </svg>
-            <p class="gauge-value" style="color:#6d4fb0">{fmt(g4Raw * 100, 2)}%</p>
-          </div>
+          <Gauge
+            label="1st law efficiency"
+            value={g1Val}
+            valueText={fmt(g1Val * 100, 2)}
+            unit="%"
+            accent="#f2ac41"
+            accentDim="#c07a10"
+          />
+          <Gauge
+            label="2nd law efficiency"
+            value={g2Val}
+            valueText={fmt(g2Val * 100, 2)}
+            unit="%"
+            accent="#35d6b4"
+            accentDim="#14b8a6"
+          />
+          <Gauge
+            label="LP exhaust quality"
+            value={g3Frac}
+            valueText={result.x5 >= 0 ? fmt(result.x5 * 100, 1) : 'S/H'}
+            unit={result.x5 >= 0 ? '%' : ''}
+            accent={g3Accent}
+            accentDim={g3AccentDim}
+            warn={g3Warn}
+            dangerBelow={0.85}
+          />
+          <Gauge
+            label="Pump power fraction"
+            value={g4Raw}
+            valueText={fmt(g4Raw * 100, 2)}
+            unit="%"
+            accent="#b39ef7"
+            accentDim="#6d4fb0"
+          />
         </div>
 
         <!-- Key readouts -->
         <div class="readout-grid">
-          <div class="readout-card readout-card-hero">
+          <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Net electrical output</p>
             <p class="readout-value readout-value-amber">{fmt(result.W_net / 1e6, 1)} <span class="readout-unit">MW</span></p>
           </div>
-          <div class="readout-card">
+          <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Total steam flow</p>
             <p class="readout-value">{fmt(result.m, 1)} <span class="readout-unit">kg/s</span></p>
           </div>
-          <div class="readout-card">
+          <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Condenser pressure</p>
             <p class="readout-value">{fmt(result.P6 / 1000, 2)} <span class="readout-unit">kPa</span></p>
           </div>
-          <div class="readout-card">
+          <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Condenser temp</p>
             <p class="readout-value">{fmt(result.T6C, 2)} <span class="readout-unit">°C</span></p>
           </div>
-          <div class="readout-card">
+          <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Wet-bulb temp</p>
             <p class="readout-value">{fmt(result.T_wb, 2)} <span class="readout-unit">°C</span></p>
           </div>
-          <div class="readout-card">
+          <div class="readout-card chamfer-panel chamfer-sm">
+            <p class="readout-label">CW in → out</p>
+            <p class="readout-value">{fmt(result.T_cw_in, 1)}→{fmt(result.T_cw_out, 1)} <span class="readout-unit">°C</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm">
+            <p class="readout-label">Condenser range</p>
+            <p class="readout-value">{fmt(result.cond_range, 2)} <span class="readout-unit">°C</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm">
+            <p class="readout-label">Condenser TTD</p>
+            <p class="readout-value">{fmt(result.cond_TTD_eff, 2)} <span class="readout-unit">°C</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm">
+            <p class="readout-label">Circulating water flow</p>
+            <p class="readout-value">{fmt(result.mdot_cw, 0)} <span class="readout-unit">kg/s</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Turbine work</p>
             <p class="readout-value">{fmt(result.W_turb / 1e6, 1)} <span class="readout-unit">MW</span></p>
           </div>
-          <div class="readout-card">
+          <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Exergy to working fluid</p>
             <p class="readout-value">{fmt(result.Ex_sg / 1e6, 1)} <span class="readout-unit">MW</span></p>
           </div>
-          <div class="readout-card">
+          <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Heat rejected (condenser)</p>
-            <p class="readout-value">{fmt(result.flow_cond * (result.h5 - result.h6) / 1e6, 1)} <span class="readout-unit">MW</span></p>
+            <p class="readout-value">{fmt(result.Q_cond / 1e6, 1)} <span class="readout-unit">MW</span></p>
           </div>
         </div>
 
         <!-- Extraction fractions -->
-        <div class="extraction-wrap">
+        <div class="extraction-wrap chamfer-panel">
           <p class="group-label" style="margin-bottom:5px">Extraction fractions</p>
           <table class="extraction-table">
             <thead><tr><th>Bleed</th><th>kg/s</th><th>% of ṁ</th></tr></thead>
@@ -675,6 +665,7 @@
     gap: 32px;
     align-items: start;
     width: 100%;
+    font-family: var(--font-display);
   }
   @media (max-width: 800px) { .rankine-wrap { grid-template-columns: 1fr; } }
 
@@ -682,22 +673,33 @@
   .loading-state {
     grid-column: 1 / -1;
     display: flex; flex-direction: column; align-items: center;
-    gap: 16px; padding: 60px 0; color: #6b7566; font-size: 15px;
+    gap: 16px; padding: 60px 0; color: var(--ink-dim); font-size: 15px;
   }
   .loading-spinner {
     width: 32px; height: 32px;
-    border: 3px solid #dde1d8; border-top-color: #14b8a6;
+    border: 3px solid var(--steel-800); border-top-color: var(--teal-dim);
     border-radius: 50%; animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
   .error-banner {
-    grid-column: 1 / -1; background: #fef2f2; border: 1px solid #fca5a5;
-    border-radius: 6px; padding: 12px 16px; color: #b91c1c; font-size: 14px;
+    grid-column: 1 / -1; padding: 12px 16px; color: var(--red-dim); font-size: 14px;
   }
+  /* Fixed as a toast (not inline in controls-col) so it's visible regardless of
+     where the page is scrolled when an auto-clamp fires. */
   .order-warning {
-    background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px;
-    padding: 9px 12px; color: #92400e; font-size: 12.5px; margin-bottom: 12px;
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    max-width: min(90vw, 480px);
+    padding: 12px 16px; color: var(--amber-dim); font-size: 12.5px;
     line-height: 1.4;
+    z-index: 100;
+    animation: order-warning-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes order-warning-in {
+    from { opacity: 0; transform: translateX(-50%) translateY(14px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
 
   /* Gauges */
@@ -707,55 +709,28 @@
   @media (max-width: 700px) {
     .gauge-grid { grid-template-columns: repeat(2, 1fr); }
   }
-  @media (max-width: 480px) {
-    .gauge-grid { grid-template-columns: 1fr; }
-  }
-  .gauge-card {
-    background: #f5f6f4; border: 1px solid #dde1d8; border-radius: 6px; padding: 10px;
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
-  }
-  .gauge-card-alarm {
-    border-color: #f3a5a5;
-    animation: alarm-ring 1.3s ease-out infinite;
-  }
-  .gauge-label {
-    font-size: 10.5px; font-weight: 600; letter-spacing: 0.03em; line-height: 1.25;
-    text-transform: uppercase; color: #6b7566; margin: 0 0 6px;
-  }
-  .gauge-svg { width: 100%; height: auto; display: block; }
-  .gauge-tick { font-size: 10px; fill: #8d9686; }
-  .gauge-value {
-    text-align: center; font-size: 20px; font-weight: 600;
-    margin: 4px 0 0; font-variant-numeric: tabular-nums;
-  }
-  .gauge-value-amber { color: #c07a10; }
-  .gauge-value-teal  { color: #1a9b73; }
 
-  /* Playful idle wiggle on every gauge needle — purely decorative, staggered per gauge
-     via animation-delay (negative delays start each gauge mid-cycle, out of phase). */
-  .gauge-needle-grp {
-    transform-origin: 80px 85px;
-    animation: needle-jiggle 2.4s ease-in-out infinite;
-  }
-  @keyframes needle-jiggle {
-    0%, 100% { transform: rotate(0deg); }
-    25%      { transform: rotate(-3deg); }
-    75%      { transform: rotate(3deg); }
-  }
-
-  /* Accordion slider groups */
+  /* Accordion slider groups - each a standalone chamfered instrument plate */
   .slider-details {
-    border-bottom: 1px solid #dde1d8; margin-bottom: 0;
+    margin-bottom: 12px;
   }
-  .slider-details:first-of-type { border-top: 1px solid #dde1d8; }
   .details-summary {
-    font-size: 11px; font-weight: 600; letter-spacing: 0.07em;
-    text-transform: uppercase; color: #6b7566;
-    padding: 10px 8px; margin: 0 -8px; border-radius: 5px;
-    cursor: pointer; user-select: none; transition: background-color 0.15s;
+    font-family: var(--font-display);
+    font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--ink);
+    padding: 9px 12px; margin: 0;
+    cursor: pointer; user-select: none; transition: color 0.15s;
     list-style: none; display: flex; justify-content: space-between; align-items: center;
   }
-  .details-summary:hover { background-color: #f0f2ee; color: #1a1f18; }
+  .details-summary::before {
+    content: '';
+    display: inline-block;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--slider-color, #8d9686);
+    box-shadow: 0 0 5px 1px var(--slider-color, transparent);
+    margin-right: 8px;
+  }
+  .details-summary:hover { color: var(--paper); }
   .details-summary::-webkit-details-marker { display: none; }
   .details-summary::after {
     content: ''; width: 0; height: 0; flex-shrink: 0;
@@ -765,166 +740,151 @@
     transition: transform 0.15s ease;
   }
   .slider-details[open] > .details-summary::after { transform: rotate(90deg); }
-  .slider-body { padding: 4px 0 12px; }
+  .slider-body { padding: 2px 12px 14px; }
+
+  /* Emergent condenser metrics helper line under the cooling sliders */
+  .cond-helper {
+    font-family: var(--font-mono);
+    font-size: 11px; color: var(--blue); line-height: 1.4; margin: 8px 0 0;
+    padding: 7px 9px; background: rgba(111, 178, 238, 0.07); border: 1px solid rgba(111, 178, 238, 0.25); border-radius: 3px;
+  }
 
   /* Shared label style (used by group-label elsewhere) */
   .group-label {
-    font-size: 11px; font-weight: 600; letter-spacing: 0.07em;
-    text-transform: uppercase; color: #8d9686; margin: 0 0 8px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--ink-dim); margin: 0 0 8px;
   }
-  .slider-row { margin-bottom: 9px; }
+  .slider-row { margin-bottom: 11px; }
   .slider-label {
-    display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px;
+    display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px;
   }
-  .slider-label span:first-child { font-size: 13px; color: #4a5244; }
+  .slider-label span:first-child { font-size: 13px; color: var(--ink); }
   .slider-value {
-    font-size: 13px; font-weight: 600; color: #1a1f18;
+    font-size: 13px; font-weight: 400; color: var(--paper);
     font-variant-numeric: tabular-nums; min-width: 56px; text-align: right;
   }
 
   /* Readout cards */
   .readout-grid {
     display: grid; grid-template-columns: repeat(4, 1fr);
-    gap: 6px; margin-top: 12px; margin-bottom: 14px;
+    gap: 8px; margin-top: 14px; margin-bottom: 16px;
   }
   @media (max-width: 480px) {
     .readout-grid { grid-template-columns: repeat(2, 1fr); }
   }
   .readout-card {
-    background: #f5f6f4; border: 1px solid #dde1d8; border-radius: 6px; padding: 8px 10px;
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    padding: 8px 10px;
   }
   .readout-label {
-    font-size: 10.5px; font-weight: 500; letter-spacing: 0.03em; line-height: 1.25;
-    color: #6b7566; text-transform: uppercase; margin: 0 0 3px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.04em; line-height: 1.25;
+    color: var(--ink-dim); text-transform: uppercase; margin: 0 0 4px;
   }
   .readout-value {
-    font-size: 16px; font-weight: 600; color: #1a1f18;
+    font-size: 16px; font-weight: 400; color: var(--paper);
     margin: 0; font-variant-numeric: tabular-nums; white-space: nowrap;
   }
-  .readout-value-amber { color: #c07a10; }
-  .readout-unit { font-size: 11px; font-weight: 400; color: #6b7566; }
-
-  /* Hero glow on the headline output card — slow, ambient breathing glow */
-  .readout-card-hero {
-    border-color: #ecc98f;
-    box-shadow: 0 0 0 1px rgba(192, 122, 16, 0.12), 0 0 14px rgba(192, 122, 16, 0.28);
-    animation: hero-glow 2.6s ease-in-out infinite;
-  }
-  @keyframes hero-glow {
-    0%, 100% { box-shadow: 0 0 0 1px rgba(192, 122, 16, 0.12), 0 0 12px rgba(192, 122, 16, 0.22); }
-    50%      { box-shadow: 0 0 0 1px rgba(192, 122, 16, 0.2),  0 0 22px rgba(192, 122, 16, 0.45); }
-  }
-
-  /* Alarm state — radar-style expanding ring on the card + a glowing pulse on the value */
-  @keyframes alarm-ring {
-    0%   { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
-    70%  { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
-  }
-  .readout-warn {
-    color: #dc2626;
-    animation: warn-pulse 1.3s ease-in-out infinite;
-  }
-  @keyframes warn-pulse {
-    0%, 100% { text-shadow: 0 0 0 rgba(220, 38, 38, 0); }
-    50%      { text-shadow: 0 0 9px rgba(220, 38, 38, 0.65); }
-  }
+  .readout-value-amber { color: var(--amber-dim); }
+  .readout-unit { font-family: var(--font-display); font-size: 11px; font-weight: 500; color: var(--ink-dim); }
 
   /* Extraction table */
-  .extraction-wrap { margin-bottom: 12px; }
+  .extraction-wrap { margin-bottom: 12px; padding: 12px 14px; }
   .extraction-table {
-    width: 100%; border-collapse: collapse; font-size: 13px; color: #1a1f18;
+    width: 100%; border-collapse: collapse; font-size: 13px; color: var(--paper);
   }
   .extraction-table th {
-    font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
-    text-transform: uppercase; color: #8d9686;
-    text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid #dde1d8;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--ink-dim);
+    text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--steel-900);
   }
   .extraction-table td {
+    font-family: var(--font-mono);
     padding: 4px 8px 4px 0; font-variant-numeric: tabular-nums;
-    border-bottom: 1px solid #eef0eb; color: #4a5244;
+    border-bottom: 1px solid var(--steel-800); color: var(--ink);
   }
-  .bleed-key { font-weight: 600; color: #c07a10; }
+  .bleed-key { font-weight: 700; color: var(--amber-dim); }
 
   /* Diagram */
   .diagram-col { position: sticky; top: 16px; }
   .diagram-title {
-    font-size: 12px; font-weight: 600; color: #6b7566;
-    text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 6px;
+    font-size: 12px; font-weight: 700; color: var(--ink-dim);
+    text-transform: uppercase; letter-spacing: 0.07em; margin: 0 0 8px;
   }
+  .scope-panel { padding: 14px; }
   .ts-svg { width: 100%; height: auto; display: block; overflow: visible; }
 
   /* SVG classes */
-  .axis      { stroke: #9ca89a; stroke-width: 1; }
-  .grid-line { stroke: #e8ede3; stroke-width: 1; }
-  .axis-tick  { font-size: 11px; fill: #6b7566; }
-  .axis-label { font-size: 12px; fill: #6b7566; }
+  .axis      { stroke: var(--steel-900); stroke-width: 1; }
+  .grid-line { stroke: rgba(0, 0, 0, 0.08); stroke-width: 1; }
+  .axis-tick  { font-family: var(--font-mono); font-size: 11px; fill: var(--ink-dim); }
+  .axis-label { font-family: var(--font-display); font-size: 12px; fill: var(--ink-dim); }
 
-  .dome      { fill: none; stroke: #5dcaa5; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .dome      { fill: none; stroke: var(--teal-dim); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 2px rgba(20, 184, 166, 0.3)); }
 
-  .path-boiler  { fill: none; stroke: #e8935f; stroke-width: 2.5; }
-  .path-reheat  { fill: none; stroke: #c07a10; stroke-width: 2.5; }
-  .path-expand  { fill: none; stroke: #6b7566; stroke-width: 2; }
-  .path-cond    { fill: none; stroke: #5ba3e8; stroke-width: 2; }
-  .path-fw      { fill: none; stroke: #1a9b73; stroke-width: 2; stroke-dasharray: 5 3; }
+  .path-steam-gen { fill: none; stroke: #e8935f; stroke-width: 2.5; }
+  .path-reheat  { fill: none; stroke: var(--amber); stroke-width: 2.5; }
+  .path-expand  { fill: none; stroke: var(--ink); stroke-width: 2; }
+  .path-cond    { fill: none; stroke: var(--blue); stroke-width: 2; }
+  .path-fw      { fill: none; stroke: var(--teal-dim); stroke-width: 2; stroke-dasharray: 5 3; }
   .path-shell   { fill: none; stroke: #7ba8cc; stroke-width: 2; }
-  .path-drain   { fill: none; stroke: #c07a10; stroke-width: 1.5; stroke-dasharray: 4 2; }
+  .path-drain   { fill: none; stroke: var(--amber-dim); stroke-width: 1.5; stroke-dasharray: 4 2; }
 
-  .state-pt       { fill: #1a1f18; cursor: default; }
-  .state-pt-ex    { fill: #ef9f27; stroke: #1a1f18; stroke-width: 0.5; cursor: default; }
-  .state-pt-drain { fill: #5ba3e8; stroke: #1a1f18; stroke-width: 0.5; cursor: default; }
+  .state-pt       { fill: var(--paper); stroke: #000; stroke-width: 0.5; cursor: default; }
+  .state-pt-ex    { fill: var(--amber); stroke: #000; stroke-width: 0.5; cursor: default; }
+  .state-pt-drain { fill: var(--blue); stroke: #000; stroke-width: 0.5; cursor: default; }
 
   /* State visibility accordion content */
   .selection-hint {
-    font-size: 11.5px; color: #6b7566; margin: 0 0 10px; line-height: 1.45;
+    font-size: 11.5px; color: var(--ink-dim); margin: 0 0 10px; line-height: 1.45;
   }
   .extraction-groups { display: flex; flex-direction: column; gap: 8px; }
   .ex-group { display: flex; align-items: flex-start; gap: 8px; }
   .ex-letter {
-    font-size: 12px; font-weight: 700; color: #4a5244;
+    font-family: var(--font-mono);
+    font-size: 12px; font-weight: 700; color: var(--ink);
     min-width: 14px; padding-top: 1px; flex-shrink: 0;
   }
   .ex-checks { display: flex; flex-direction: column; gap: 4px; flex: 1; }
   .sel-item {
     display: flex; align-items: flex-start; gap: 6px;
-    cursor: pointer; font-size: 12px; color: #4a5244; line-height: 1.35;
+    cursor: pointer; font-size: 12px; color: var(--ink); line-height: 1.35;
   }
   .sel-item input[type="checkbox"] {
-    margin-top: 2px; accent-color: #5ba3e8; flex-shrink: 0; cursor: pointer;
+    margin-top: 2px; accent-color: var(--blue); flex-shrink: 0; cursor: pointer;
   }
   .sel-dot {
     display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-    background: #ef9f27; border: 1px solid #1a1f18; flex-shrink: 0; margin-top: 3px;
+    background: var(--amber); border: 1px solid #000; flex-shrink: 0; margin-top: 3px;
   }
-  .sel-dot-drain { background: #5ba3e8; }
+  .sel-dot-drain { background: var(--blue); }
   .sel-label { flex: 1; }
 
   /* Legend */
-  .diagram-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 7px; }
+  .diagram-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 9px; }
   .leg {
-    font-size: 12px; color: #6b7566;
+    font-size: 12px; color: var(--ink-dim);
     display: flex; align-items: center; gap: 5px;
   }
   .leg::before { content: ''; display: inline-block; width: 18px; height: 2px; }
-  .leg-boiler::before { background: #e8935f; }
-  .leg-reheat::before { background: #c07a10; }
-  .leg-expand::before { background: #6b7566; }
-  .leg-cond::before   { background: #5ba3e8; }
-  .leg-fw::before     { background: #1a9b73; }
+  .leg-steam-gen::before { background: #e8935f; }
+  .leg-reheat::before { background: var(--amber); }
+  .leg-expand::before { background: var(--ink); }
+  .leg-cond::before   { background: var(--blue); }
+  .leg-fw::before     { background: var(--teal-dim); }
   .leg-shell::before  { background: #7ba8cc; }
-  .leg-drain::before  { background: #c07a10; }
-  .leg-dome::before   { background: #5dcaa5; }
+  .leg-drain::before  { background: var(--amber-dim); }
+  .leg-dome::before   { background: var(--teal-dim); }
 
   /* Page title with reactive supercritical strikethrough */
   .page-title {
-    font-size: 22px; font-weight: 700; color: #1a1f18;
-    margin: 0 0 12px; line-height: 1.3;
+    font-family: var(--font-display);
+    font-size: 24px; font-weight: 700; color: var(--paper);
+    letter-spacing: 0.02em;
+    margin: 0 0 16px; line-height: 1.3;
   }
   .title-super {
     transition: text-decoration 0.2s, opacity 0.2s, color 0.2s;
   }
   .title-super.struck {
-    text-decoration: line-through; opacity: 0.45; color: #8d9686;
+    text-decoration: line-through; opacity: 0.4; color: var(--ink-dim);
   }
 </style>

@@ -1,73 +1,271 @@
 @import "tailwindcss";
 
-/* ── Cross-browser range slider ───────────────────────────────────────────────
-   Components set --slider-color for per-slider tinting.
-   BaseLayout.astro injects JS that keeps --pct in sync with the value,
-   enabling the split-color filled/unfilled track on webkit. */
+/* ── Design tokens ─────────────────────────────────────────────────────────
+   Industrial control-room theme: brushed aluminum panels, chamfered plates,
+   engraved nameplates, amber/teal/blue instrument colors. Light variant -
+   the --steel-* ramp keeps the same 300(lightest)..900(darkest) convention
+   used for panel-bevel gradients, just shifted into light aluminum tones.
+   Anywhere that used to rely on a LIGHT steel tone for line/stroke contrast
+   against a dark panel now needs a DARK steel tone instead - that direction
+   flips per-usage and isn't just a palette swap, see components for those. */
+:root {
+  --steel-900: #969ca3;
+  --steel-800: #adb3b9;
+  --steel-700: #c1c6ca;
+  --steel-650: #c9cdd0;
+  --steel-600: #d1d5d8;
+  --steel-500: #dde0e2;
+  --steel-400: #e7e9ea;
+  --steel-300: #f0f1f2;
+  --hairline: #0a0b0d;
+  --paper: #1c2023;
+  --ink: #3a3f44;
+  --ink-dim: #52585e;
+  --amber: #f2ac41;
+  --amber-dim: #c07a10;
+  --teal: #35d6b4;
+  --teal-dim: #14b8a6;
+  --blue: #6fb2ee;
+  --blue-dim: #2f6fa8;
+  --purple: #b39ef7;
+  --purple-dim: #6d4fb0;
+  --red: #ff6459;
+  --red-dim: #c0392b;
+  --chamfer: 14px;
+  --aluminum: url('/textures/brushed-aluminum.webp');
+
+  --font-display: 'Rajdhani', 'Segoe UI', sans-serif;
+  --font-mono: 'Share Tech Mono', 'JetBrains Mono', monospace;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--font-display);
+  color: var(--paper);
+  /* Plain, no texture - the aluminum photo stays on panels/nav only. Plain
+     background (no background-attachment: fixed) so it scrolls with the
+     page instead of staying pinned to the viewport. */
+  background: linear-gradient(180deg, #eef0f1 0%, #dfe2e4 100%);
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+/* Numeric / instrument text everywhere */
+.mono, .lcd, .gauge-value, .readout-value, .slider-value {
+  font-family: var(--font-mono);
+}
+
+/* ── Chamfered steel panel ────────────────────────────────────────────────
+   Two-layer trick: outer element clips to a chamfered hexagon and shows a
+   light-catching metal-edge gradient; an inset ::before clips to the same
+   shape 2px smaller and carries the actual panel-face gradient, faking a
+   machined bevel border without an actual border (which clip-path would
+   otherwise slice off at the cut corners). */
+.chamfer-panel {
+  --cf: var(--chamfer);
+  position: relative;
+  isolation: isolate;
+  clip-path: polygon(var(--cf) 0, 100% 0, 100% calc(100% - var(--cf)), calc(100% - var(--cf)) 100%, 0 100%, 0 var(--cf));
+  background: linear-gradient(152deg, var(--steel-500), var(--steel-800) 60%);
+  box-shadow: 0 6px 14px rgba(30, 34, 38, 0.16), 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.chamfer-panel::before {
+  content: '';
+  position: absolute;
+  inset: 1.5px;
+  z-index: 0;
+  clip-path: polygon(calc(var(--cf) - 1.5px) 0, 100% 0, 100% calc(100% - (var(--cf) - 1.5px)), calc(100% - (var(--cf) - 1.5px)) 100%, 0 100%, 0 calc(var(--cf) - 1.5px));
+  background-image: linear-gradient(165deg, var(--steel-650), var(--steel-800) 72%), var(--aluminum);
+  background-repeat: no-repeat, no-repeat;
+  background-size: cover, cover;
+  background-position: center, center;
+  background-blend-mode: overlay;
+}
+.chamfer-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Small chamfer for compact chips/badges */
+.chamfer-sm { --cf: 6px; }
+
+/* ── Drafting-paper panel ─────────────────────────────────────────────────
+   A bright vellum sheet "pinned" onto a light aluminum mat, for hosting
+   reference diagrams/drawings against a paper-and-grid backdrop. The mat
+   uses the same --steel-* panel tokens as everything else (cool light
+   gray), while the paper itself stays warm cream - the two are told apart
+   by temperature/material, not by a light-vs-dark jump. */
+.drafting-mat {
+  /* cover, not tiled: tiling would repeat the photo's own soft vertical
+     light gradient as a visible seam on a panel this tall. The panel can
+     slightly exceed the texture's native 1536px width on very large
+     viewports, but that upscale is minor (~10%) and unnoticeable, unlike a
+     seam. */
+  background-image: linear-gradient(165deg, var(--steel-600), var(--steel-800)), var(--aluminum);
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 100%, cover;
+  background-position: center, center;
+  background-blend-mode: overlay, normal;
+  padding: 18px;
+  border-radius: 3px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  margin-bottom: 28px;
+}
+.drafting-panel {
+  position: relative;
+  background:
+    linear-gradient(rgba(90, 110, 130, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(90, 110, 130, 0.09) 1px, transparent 1px),
+    #f5f0df;
+  background-size: 24px 24px, 24px 24px, auto;
+  border: 1px solid #a89a76;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  padding: 22px 22px 16px;
+}
+.drafting-panel::before {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  z-index: 0;
+  border: 1px solid #c2b48c;
+  pointer-events: none;
+}
+.drafting-panel > * {
+  position: relative;
+  z-index: 1;
+}
+.drafting-panel img {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 2px 4px rgba(60, 50, 20, 0.15));
+}
+.drafting-tape {
+  position: absolute;
+  width: 64px;
+  height: 24px;
+  background: rgba(255, 246, 200, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+.drafting-titleblock {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #c2b48c;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #6b5f42;
+  letter-spacing: 0.03em;
+}
+
+/* LCD-style digital readout chip - a light, matte calculator/e-ink screen
+   rather than a glowing black display, to match the light aluminum theme.
+   No text-shadow glow: a reflective LCD doesn't emit light the way a dark
+   LED-style screen would, so the old glow read as wrong once the rest of
+   the chip went light. */
+.lcd {
+  --accent: var(--amber-dim);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  background: linear-gradient(180deg, #e6e9e1, #d6dad0 85%);
+  border: 1px solid #9aa097;
+  border-radius: 3px;
+  padding: 3px 8px;
+  box-shadow: inset 0 1px 3px rgba(30, 34, 28, 0.18), inset 0 0 6px rgba(30, 34, 28, 0.08);
+  color: var(--accent);
+  letter-spacing: 0.03em;
+}
+
+/* ── Cross-browser range slider — recessed groove + machined knob ────────── */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 20px;
+  height: 22px;
   background: transparent;
   outline: none;
   cursor: pointer;
 }
 input[type="range"]::-webkit-slider-runnable-track {
-  height: 9px;
-  border-radius: 4.5px;
+  height: 8px;
+  border-radius: 4px;
   background: linear-gradient(
     to right,
     var(--slider-color, #14b8a6) var(--pct, 0%),
-    #d1d5db var(--pct, 0%)
+    var(--steel-800) var(--pct, 0%)
   );
+  border: 1px solid var(--hairline);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
-  background: var(--slider-color, #14b8a6);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  margin-top: -3.5px;
+  background: radial-gradient(circle at 34% 28%, #f5f6f3 0%, #a7adb3 45%, #4c525a 100%);
+  border: 1px solid #14161a;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  margin-top: -5px;
   cursor: pointer;
   transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
               box-shadow 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 input[type="range"]:hover::-webkit-slider-thumb {
-  transform: scale(1.2);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25), 0 0 0 6px color-mix(in srgb, var(--slider-color, #14b8a6) 22%, transparent);
+  transform: scale(1.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6), 0 0 0 6px color-mix(in srgb, var(--slider-color, #14b8a6) 28%, transparent);
 }
 input[type="range"]:active::-webkit-slider-thumb {
-  transform: scale(1.45);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3), 0 0 0 11px color-mix(in srgb, var(--slider-color, #14b8a6) 30%, transparent);
+  transform: scale(1.35);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.65), 0 0 0 10px color-mix(in srgb, var(--slider-color, #14b8a6) 34%, transparent);
 }
 input[type="range"]::-moz-range-track {
-  height: 9px;
-  border-radius: 4.5px;
-  background: #d1d5db;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--steel-800);
+  border: 1px solid var(--hairline);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75);
 }
 input[type="range"]::-moz-range-progress {
-  height: 9px;
-  border-radius: 4.5px;
+  height: 8px;
+  border-radius: 4px;
   background: var(--slider-color, #14b8a6);
 }
 input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
-  background: var(--slider-color, #14b8a6);
-  border: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  background: radial-gradient(circle at 34% 28%, #f5f6f3 0%, #a7adb3 45%, #4c525a 100%);
+  border: 1px solid #14161a;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(0, 0, 0, 0.22);
   cursor: pointer;
   transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
               box-shadow 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 input[type="range"]:hover::-moz-range-thumb {
-  transform: scale(1.2);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25), 0 0 0 6px color-mix(in srgb, var(--slider-color, #14b8a6) 22%, transparent);
+  transform: scale(1.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6), 0 0 0 6px color-mix(in srgb, var(--slider-color, #14b8a6) 28%, transparent);
 }
 input[type="range"]:active::-moz-range-thumb {
-  transform: scale(1.45);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3), 0 0 0 11px color-mix(in srgb, var(--slider-color, #14b8a6) 30%, transparent);
+  transform: scale(1.35);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.65), 0 0 0 10px color-mix(in srgb, var(--slider-color, #14b8a6) 34%, transparent);
+}
+
+/* Scrollbar (webkit) to match the theme */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--steel-900); }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--steel-500), var(--steel-700));
+  border-radius: 6px;
+  border: 2px solid var(--steel-900);
 }

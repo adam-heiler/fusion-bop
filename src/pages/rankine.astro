@@ -3,11 +3,24 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import RankineCycle from '../components/RankineCycle.svelte';
 ---
 <BaseLayout title="H2O Rankine">
-  <div style="max-width: 1100px; margin: 0 auto;">
-    <p class="mb-6" style="color: #6b7566; font-size: 14px;">
+  <div style="max-width: 1700px; margin: 0 auto;">
+    <p class="mb-6" style="color: #8b948c; font-size: 14px;">
       250 bar supercritical reheat regenerative cycle: 6 closed feedwater heaters,
       deaerator, 7 extraction bleeds, cooling-tower condenser. Heat duty Q = 1000 MW fixed.
     </p>
+    <div class="drafting-mat">
+      <div class="drafting-panel">
+        <span class="drafting-tape" style="top: -12px; left: 40px; transform: rotate(-3deg);"></span>
+        <span class="drafting-tape" style="top: -12px; right: 40px; transform: rotate(2deg);"></span>
+        <img src="/diagrams/fusion-rankine.png" alt="Process flow diagram of the supercritical reheat regenerative Rankine cycle balance of plant" />
+        <div class="drafting-titleblock">
+          <span>FUSION BOP &middot; H<sub>2</sub>O RANKINE CYCLE &middot; PROCESS FLOW DIAGRAM</span>
+          <span>DWG RANKINE&#8209;01&nbsp;&nbsp;REV A</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="max-width: 1100px; margin: 0 auto;">
     <RankineCycle client:only="svelte" />
   </div>
 </BaseLayout>

@@ -53,10 +53,14 @@ export function minPC(P_D, TTD, eta_pump, Pfw = 250) {
   return hi;
 }
 
-export function minPG(T0, RH, cw_approach, cond_TTD, TTD, eta_pump, Pcond = 5) {
-  const T_wb = wetbulb(T0, RH);
-  const T6C = T_wb + cw_approach + cond_TTD;
-  const P6 = Q('P', 'T', T6C + C2K, 'Q', 0);
+// minPG now takes the condenser saturation TEMPERATURE directly (T6C_est, °C), because
+// under the Level-3 ε-NTU condenser model the condenser pressure is an emergent result of
+// the cycle heat load, not a simple ambient formula. The component passes the most recent
+// solved T6C (one drag-step stale — an excellent estimate since sliders move incrementally);
+// on first load it passes a nominal estimate. The clamp only needs T6C to bound P_G so that
+// FWH1's feedwater outlet stays above the condensate + condensate-pump delivery (g ≥ 0).
+export function minPG(T6C_est, TTD, eta_pump, Pcond = 5) {
+  const P6 = Q('P', 'T', T6C_est + C2K, 'Q', 0);
   const PcondPa = Pcond * BAR;
   const h6 = satH(P6);
   const s6 = Q('S', 'P', P6, 'Q', 0);
@@ -80,6 +84,8 @@ function Q(out, n1, v1, n2, v2) {
 }
 
 function wetbulb(T, RH) {
+  // Stull (2011) single-equation wet-bulb approximation from dry-bulb T (°C) and RH (%),
+  // valid near sea-level pressure (R. Stull, J. Appl. Meteorol. Climatol. 50, 2267 (2011)).
   return (
     T * Math.atan(0.151977 * Math.sqrt(RH + 8.313659)) +
     Math.atan(T + RH) -
@@ -169,15 +175,18 @@ export function solveCycle(p) {
   _qCache.clear();   // bound cache to a single solve (see memo note at top of file)
   const TTD = p.TTD, sub = p.subcool, eta_p = p.eta_pump;
 
-  // Cooling tower / condenser
+  // ── Cooling tower: cold circulating-water temperature into the condenser ──────
+  // T_cw_in = wet-bulb + cooling-tower approach (approach = cold-water-minus-wet-bulb;
+  // source: cooling-tower approach/range definitions, ScienceDirect "Cooling Tower"
+  // overview; Deppmann "Cooling Tower Temperatures"). The condenser SATURATION temperature
+  // is NOT known yet — under the Level-3 ε-NTU model it is an emergent result of the cycle
+  // heat load and is solved for below. cp of the circulating water is evaluated once near
+  // its own conditions (~1.5 bar liquid).
   const T_wb = wetbulb(p.T0, p.RH);
-  const T6C = T_wb + p.cw_approach + p.cond_TTD;
-  const P6 = Q('P', 'T', T6C + C2K, 'Q', 0);
-  const h6 = satH(P6);
-  const s6 = Q('S', 'P', P6, 'Q', 0);
-  const P5 = P6;
+  const T_cw_in = T_wb + p.cw_approach;
+  const cp_cw = Q('CPMASS', 'P', 1.5 * BAR, 'T', (T_cw_in + 8) + C2K);
 
-  // Boiler outlet (supercritical)
+  // Steam generator outlet (supercritical)
   const P1 = p.P1 * BAR;
   const T1 = p.T1 + C2K;
   const h1 = Q('H', 'P', P1, 'T', T1);
@@ -209,12 +218,9 @@ export function solveCycle(p) {
   const P_D = p.P_D * BAR;
   const h_d1 = expand(h3, s3, P_D, p.eta_IP);
 
-  // LP turbine
-  const h5 = expand(h4, s4, P5, p.eta_LP);
-  const s5 = Q('S', 'P', P5, 'H', h5);
-  const T5 = T6C; // condenser saturation temp
-  const x5 = Q('Q', 'P', P5, 'H', h5); // LP exhaust steam quality (-1 if superheated)
-
+  // LP turbine extraction enthalpies (P6-independent; depend only on state 4).
+  // The LP EXHAUST state (h5, s5, T5, x5) depends on the condenser pressure P6, which is
+  // still unknown here, so it is computed after the ε-NTU condenser converges (below).
   const P_E = p.P_E * BAR;
   const h_e1 = expand(h4, s4, P_E, p.eta_LP);
   const P_F = p.P_F * BAR;
@@ -271,7 +277,10 @@ export function solveCycle(p) {
   const h_c3 = h_c2;   // Valve C isenthalpic (h_e3 would equal h_e2 likewise; E3 states
                        // are computed directly from h_e2 below, so no binding is needed).
 
-  // Mass flow rate (new state 15 = boiler inlet, replaces old state 16)
+  // Mass flow rate (new state 15 = boiler inlet, replaces old state 16).
+  // NOTE: m depends only on h1 and h15, NEITHER of which depends on condenser pressure.
+  // This is what makes the ε-NTU condenser's C_cw and ε fixed per solve, and the T_cond
+  // fixed point below a clean scalar contraction rather than a coupled multi-variable solve.
   const Qdot = p.Q * 1e6;
   const m = Qdot / (h1 - h15);
 
@@ -348,31 +357,73 @@ export function solveCycle(p) {
   const f = flow_fwh2 * (h8p - h7p) / (h_f1 - h_f2 + h_f3 - h7p);
   const h8 = ((flow_fwh2 - f) * h7p + f * h_f3) / flow_fwh2;  // new state 8 (M1 outlet)
 
-  // g + state 6: FWH1 + combined Condenser+Hotwell control volume.
-  //
-  // New state 6 = combined condenser+hotwell outlet = sat. liquid at P6.
-  // Old states 6 and 7 are merged into new state 6 (they were thermodynamically identical:
-  // h_old7 = h_old6 = h_sat_liq(P6) by construction of the combined control volume model).
-  //
-  // The condenser and hotwell are ONE combined control volume because the FWH1 drain (g3)
-  // throttles from P_G (~1.5 bar) to condenser vacuum (~3 kPa) through Valve G — a large
-  // enough pressure ratio that g3 partially flashes to vapor. A naive two-stream mixer
-  // would predict a two-phase mixture entering the condensate pump (cavitation risk).
-  // Instead: the hotwell sits inside the condenser shell with a vapor space above the liquid
-  // pool; flashed vapor rejoins the bulk steam and is re-condensed. The combined volume
-  // outlet is therefore always sat. liquid at P6, regardless of how much g3 flashes.
-  // This also makes the FWH1 balance LINEAR in g (new state 6 no longer depends on g).
   const flow_fwh1 = m - a - b - c - d - e - f;
-  // h6 and s6 already declared in the cooling tower section above:
-  //   h6 = satH(P6) = sat. liquid at condenser pressure (new state 6)
-  //   s6 = Q('S','P',P6,'Q',0)
-  const h7 = compress(h6, s6, Pcond, eta_p);     // new state 7: condensate pump outlet
 
-  const g = flow_fwh1 * (h7p - h7) / (h_g1 - h_g2);
+  // ── Condenser: ε-NTU condensing (Cr=0) heat exchanger + bounded fixed point ───
+  //
+  // The condenser rejects Q_cond to circulating water entering at T_cw_in. Because steam
+  // condenses at constant temperature, the heat-capacity-rate ratio Cr = Cmin/Cmax → 0,
+  // for which the effectiveness is independent of flow arrangement and reduces to
+  //   ε = 1 − exp(−NTU),   NTU = UA / (ṁ_cw·cp)
+  // (source: Wikipedia "NTU method", Cmax=∞ / phase-change special case; standard ε-NTU
+  // texts, e.g. Incropera). With Cmin = ṁ_cw·cp on the water side:
+  //   Q_cond = ε·Cmin·(T_cond − T_cw_in)  ⇒  T_cond = T_cw_in + Q_cond/(ε·Cmin).
+  //
+  // Q_cond depends on P6 (through h5, h6, the FWH1 extraction g, and flow_cond), while
+  // ṁ_cw, C_cw and ε are FIXED per solve (m is P6-independent). So this is a scalar fixed
+  // point on T_cond. It is a strong contraction (residual ratio ≈ 0.03 per iteration,
+  // converges in ≤2 iterations across a 540-case sweep — level3_prototype.py) and the
+  // whole-plant First Law closes to 0.000000 MW at the converged pressure
+  // (validate_level3.py). The loop is BOUNDED (fixed max passes) so it can never hang.
+  //
+  // ṁ_cw is set by the circulating-water : steam mass ratio input (r_cw). UA is the held
+  // physical condenser conductance; the terminal difference (cond_TTD_eff) and the CW
+  // temperature rise (cond_range) are EMERGENT outputs, not inputs.
+  const mdot_cw = p.r_cw * m;
+  const C_cw = mdot_cw * cp_cw;
+  const NTU_cond = p.UA / C_cw;
+  const eps_cond = 1 - Math.exp(-NTU_cond);
+
+  let T6C = T_cw_in + 13;   // initial guess for condenser saturation temperature (°C)
+  let P6, h6, s6, h5, h7, g, flow_cond, Q_cond;
+  const COND_MAXIT = 40, COND_TOL = 1e-5;
+  for (let it = 0; it < COND_MAXIT; it++) {
+    P6 = Q('P', 'T', T6C + C2K, 'Q', 0);
+    h6 = satH(P6);
+    s6 = Q('S', 'P', P6, 'Q', 0);
+    h5 = expand(h4, s4, P6, p.eta_LP);            // LP exhaust at condenser pressure
+    h7 = compress(h6, s6, Pcond, eta_p);          // condensate pump outlet (new state 7)
+    g  = flow_fwh1 * (h7p - h7) / (h_g1 - h_g2);  // FWH1 extraction fraction
+    flow_cond = flow_fwh1 - g;
+    Q_cond = flow_cond * h5 + g * h_g2 - flow_fwh1 * h6;
+    const T6C_new = T_cw_in + Q_cond / (eps_cond * C_cw);
+    if (Math.abs(T6C_new - T6C) < COND_TOL && it > 0) { T6C = T6C_new; break; }
+    T6C = T6C_new;
+  }
+  // Finalize the converged condenser + LP-exhaust state (recompute at the converged T6C so
+  // every downstream quantity uses one self-consistent condenser pressure).
+  P6 = Q('P', 'T', T6C + C2K, 'Q', 0);
+  const P5 = P6;
+  h6 = satH(P6);
+  s6 = Q('S', 'P', P6, 'Q', 0);
+  h5 = expand(h4, s4, P5, p.eta_LP);
+  h7 = compress(h6, s6, Pcond, eta_p);
+  g  = flow_fwh1 * (h7p - h7) / (h_g1 - h_g2);
+  flow_cond = flow_fwh1 - g;
+  Q_cond = flow_cond * h5 + g * h_g2 - flow_fwh1 * h6;
+  const s5 = Q('S', 'P', P5, 'H', h5);
+  const T5 = T6C;                              // condenser saturation temp
+  const x5 = Q('Q', 'P', P5, 'H', h5);         // LP exhaust steam quality (-1 if superheated)
+
+  // Emergent circulating-water metrics (readouts, not inputs). range = CW temperature rise
+  // (set by heat load and flow), TTD = condenser terminal difference (steam saturation temp
+  // minus warm CW outlet), consistent with the range/approach/TTD definitions in the
+  // cooling-tower and steam-surface-condenser references.
+  const cond_range   = Q_cond / C_cw;          // CW temperature rise across the condenser
+  const T_cw_out     = T_cw_in + cond_range;
+  const cond_TTD_eff = T6C - T_cw_out;         // condenser terminal temperature difference
 
   // ── Derived power outputs ─────────────────────────────────────────────────
-
-  const flow_cond = m - a - b - c - d - e - f - g;
 
   const W_HP  = (m - a) * h1 - (m - a - b) * h2 - b * h_b1;
   const W_IP  = (m - a - b) * h3 - (m - a - b - c - d) * h4 - c * h_c1 - d * h_d1;
@@ -406,16 +457,16 @@ export function solveCycle(p) {
 
   // T-s diagram paths
 
-  // Boiler path: new state 15 (boiler inlet) to state 1 (boiler outlet).
+  // Steam-generator path: new state 15 (boiler inlet) to state 1 (boiler outlet).
   // Handles both supercritical (smooth) and subcritical (plateau) cases.
   const T15K = Q('T', 'P', Pfw, 'H', h15);
   const Pcrit = PCRIT_PA;   // hoisted constant (see PCRIT_PA definition + source at top)
-  const boilerPath = [];
+  const steamGenPath = [];
 
   if (P1 >= Pcrit) {
     for (let i = 0; i <= 35; i++) {
       const Tp = T15K + (T1 - T15K) * i / 35;
-      boilerPath.push([Q('S', 'P', P1, 'T', Tp) / 1000, Tp - C2K]);
+      steamGenPath.push([Q('S', 'P', P1, 'T', Tp) / 1000, Tp - C2K]);
     }
   } else {
     const Tsat = Q('T', 'P', P1, 'Q', 0);
@@ -424,7 +475,7 @@ export function solveCycle(p) {
       const n1 = 10;
       for (let i = 0; i <= n1; i++) {
         const Tp = T15K + (Tsat - EPS - T15K) * i / n1;
-        boilerPath.push([Q('S', 'P', P1, 'T', Tp) / 1000, Tp - C2K]);
+        steamGenPath.push([Q('S', 'P', P1, 'T', Tp) / 1000, Tp - C2K]);
       }
     }
     if (T15K < Tsat + EPS && T1 > Tsat - EPS) {
@@ -432,14 +483,14 @@ export function solveCycle(p) {
       const sf = Q('S', 'P', P1, 'Q', 0) / 1000;
       const sg = Q('S', 'P', P1, 'Q', 1) / 1000;
       for (let i = 0; i <= n2; i++) {
-        boilerPath.push([sf + (sg - sf) * i / n2, Tsat - C2K]);
+        steamGenPath.push([sf + (sg - sf) * i / n2, Tsat - C2K]);
       }
     }
     if (T1 > Tsat + EPS) {
       const n3 = 10;
       for (let i = 0; i <= n3; i++) {
         const Tp = (Tsat + EPS) + (T1 - (Tsat + EPS)) * i / n3;
-        boilerPath.push([Q('S', 'P', P1, 'T', Tp) / 1000, Tp - C2K]);
+        steamGenPath.push([Q('S', 'P', P1, 'T', Tp) / 1000, Tp - C2K]);
       }
     }
   }
@@ -637,8 +688,10 @@ export function solveCycle(p) {
     h8, h9, h10, h11, h12, h13, h14, h15,
     W_net, W_turb, W_pumps, eta_1, eta_2, x5, Ex_sg,
     T6C, T_wb, P6, flow_cond,
+    // Level-3 circulating-water / condenser readouts (all emergent):
+    mdot_cw, cp_cw, NTU_cond, eps_cond, cond_range, cond_TTD_eff, T_cw_in, T_cw_out, Q_cond,
     statePoints, extractionStatePoints,
-    boilerPath, reheatPath, fwPath,
+    steamGenPath, reheatPath, fwPath,
     hpPath, ipPath, lpPath, fwhShellPaths, condenserPath, drainPaths,
     s1: s1/1000, s2: s2/1000, s3: s3/1000,
     s4: s4/1000, s5: s5/1000, s6: s6v,
