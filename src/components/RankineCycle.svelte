@@ -3,20 +3,14 @@
   import { initSolver, solveCycleAsync, minPCAsync, minPGAsync, maxPEAsync } from '../lib/solverWorkerClient.js';
   import Gauge from './Gauge.svelte';
 
-  // -- Slider state -----------------------------------------------------------
-  // Single source of truth for every slider's starting value, so the Reset button (below)
-  // can restore the exact same cycle rather than drifting from these initializers over time.
+  // Slider defaults, also used by the Reset button below.
   const DEFAULTS = {
     P1: 250, T1: 540, T3: 500, P2: 60, P4: 5, reheat_dP_pct: 3,
     P_VA: 117, P_B: 100, P_C: 7.5, P_D: 6, P_E: 4.3, P_F: 2.2, P_G: 1.5,
     Q: 1000,
     eta_HP: 0.85, eta_IP: 0.85, eta_LP: 0.85, eta_pump: 0.85, eta_gen: 0.985,
     TTD: 2.8, T0: 25, RH: 50, cw_approach: 3.1,
-    // Level-3 circulating-water inputs (replace the old fixed cond_TTD slider):
-    //   r_cw = circulating-water : steam mass-flow ratio (sets ṁ_cw = r_cw · ṁ_steam)
-    //   UA   = condenser conductance (MW/K), the held physical size of the condenser.
-    // The condenser terminal difference (TTD) and CW temperature rise (range) are now
-    // EMERGENT outputs of the ε-NTU model, not inputs.
+    // r_cw = circulating-water : steam mass ratio; UA = condenser conductance (MW/K)
     r_cw: 23, UA: 80.9,
   };
 
@@ -53,26 +47,9 @@
   const PCRIT = 220.64;
   const isSupercritical = $derived(P1 >= PCRIT);
 
-  // ── Pressure ordering enforcement ───────────────────────────────────────────
-  // Required chain (steam generator -> condenser): P1 > P_VA > P_B > P2 > P_C > P_D > P4 > P_E >
-  // P_F > P_G. Each pressure is a heater/turbine-bleed point along the expansion path; if
-  // this ordering is violated the cycle is not physically meaningful (e.g. a "later"
-  // feedwater heater would need to heat the feedwater to a LOWER temperature than an
-  // earlier one already achieved). Sliders keep their full static range for a stable,
-  // non-jumpy track, but any edit is clamped against its neighbors immediately after, with
-  // a brief warning shown if a clamp actually had to engage.
-  //
-  // TWO of these boundaries (P_C against the deaerator at P_D, and P_G against the
-  // condenser) are NOT safely covered by pressure ordering alone: every FWH-to-FWH boundary
-  // has the SAME terminal temperature difference (TTD) subtracted on both sides, so it
-  // cancels out and pure pressure ordering is sufficient there. But the deaerator and
-  // condenser outlets are saturated liquid with NO TTD subtracted (they're direct-contact/
-  // phase-change vessels, not TTD-rated heat exchangers) - so FWH4 (against the deaerator)
-  // and FWH1 (against the condenser) each need an EXTRA temperature margin worth of
-  // pressure headroom that grows with the TTD slider. Get this wrong and the corresponding
-  // extraction fraction (c or g) goes negative, which is unphysical (steam flowing
-  // backward into the turbine) even though the solver itself won't crash.
-  const GAP = 0.1; // bar, minimum enforced separation for the simple FWH-to-FWH boundaries
+  // Pressure ordering enforcement. Required chain: P1 > P_VA > P_B > P2 > P_C >
+  // P_D > P4 > P_E > P_F > P_G. See NOTES.md for why.
+  const GAP = 0.1; // bar, minimum enforced separation between chain neighbors
 
   let orderWarning = $state('');
   let warnTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -83,28 +60,24 @@
     warnTimeout = setTimeout(() => { orderWarning = ''; }, 7000);
   }
 
-  // Minimum P_C such that FWH4's TTD-determined feedwater outlet temperature stays above
-  // what the deaerator + feedwater pump already delivers. Solved numerically inside
-  // rankineSolver.js (a few cheap CoolProp calls) rather than in closed form, since the
-  // feedwater pump's enthalpy rise doesn't invert analytically.
+  // 'P_VA' -> 'P<sub>VA</sub>', 'P1' -> 'P<sub>1</sub>'
+  function subLabel(name: string): string {
+    const m = name.match(/^P_?(.+)$/);
+    return m ? `P<sub>${m[1]}</sub>` : name;
+  }
+
+  // Minimum P_C keeping FWH4's extraction fraction non-negative.
   async function minPC(): Promise<number> {
     return minPCAsync(P_D, TTD, eta_pump);
   }
 
-  // Minimum P_G such that FWH1's TTD-determined feedwater outlet stays above what the
-  // condenser + condensate pump already delivers. Under the Level-3 ε-NTU condenser the
-  // condenser saturation temperature is emergent, so we feed the clamp the most recent
-  // solved T6C (result.T6C - one drag-step stale, an excellent estimate since sliders move
-  // incrementally). On first load, before any solve, fall back to a nominal estimate.
+  // Minimum P_G keeping FWH1's extraction fraction non-negative.
   async function minPG(): Promise<number> {
     const T6C_est = result ? result.T6C : (25 + cw_approach + 13);
     return minPGAsync(T6C_est, TTD, eta_pump);
   }
 
-  // Maximum P_E such that FWH3's TTD-determined feedwater outlet stays below the
-  // condensate pump's saturation temperature - see maxPE() in rankineSolver.js for why
-  // this boundary exists (P_G/P_F can't hit it, their own sliders top out at/below Pcond;
-  // P_E's does not) and what happens when it's crossed (outlet snaps onto the vapor branch).
+  // Maximum P_E before FWH3's feedwater outlet flashes to vapor.
   async function maxPE(): Promise<number> {
     return maxPEAsync(TTD, FIXED.P_condpump);
   }
@@ -126,17 +99,7 @@
   }
   const snap = (v: number) => +v.toFixed(3);
 
-  // Special TTD-aware boundaries, on top of plain pressure ordering: FWH4 against the
-  // deaerator (P_C), FWH1 against the condenser (P_G), and FWH3 against the condensate pump
-  // (P_E, upper-bounded instead of lower). These all depend on TTD, not just on neighboring
-  // sliders, so they're pulled out here and re-checked both after any chain-pressure edit
-  // AND after a direct TTD edit (a TTD change alone can push a pressure that hasn't moved
-  // out of bounds).
-  // Returns one human-readable reason per boundary that had to clamp, or [] if none did -
-  // callers join these onto the warning toast so the user learns WHY, not just THAT,
-  // something moved. The P_E case in particular gets specific "flashing" language: unlike
-  // the P_C/P_G cases (which prevent an unphysical negative extraction flow), crossing this
-  // one means the feedwater would genuinely start vaporizing inside the FWH3 tubes.
+  // Clamps the TTD-aware boundaries (P_C, P_G, P_E); returns a reason per boundary that fired.
   async function enforceTTDBoundaries(): Promise<string[]> {
     const chain = getChain();
     const reasons: string[] = [];
@@ -144,7 +107,7 @@
     const pcMin = await minPC();
     if (pcMin > 0 && P_C < pcMin) {
       P_C = snap(pcMin);
-      reasons.push(`P_C (FWH4) raised to ${P_C} bar - any lower and the deaerator would already be hotter than FWH4 could deliver, forcing its extraction flow negative.`);
+      reasons.push(`${subLabel('P_C')} (FWH4) raised to ${P_C} bar - any lower and the deaerator would already be hotter than FWH4 could deliver, forcing its extraction flow negative.`);
       for (let i = chain.findIndex(([n]) => n === 'P_C') - 1; i >= 0; i--) {
         const [, get, set, lo, hi] = chain[i];
         const [, getBelow] = chain[i + 1];
@@ -154,7 +117,7 @@
     const pgMin = await minPG();
     if (pgMin > 0 && P_G < pgMin) {
       P_G = snap(pgMin);
-      reasons.push(`P_G (FWH1) raised to ${P_G} bar - any lower and the condenser would already be hotter than FWH1 could deliver, forcing its extraction flow negative.`);
+      reasons.push(`${subLabel('P_G')} (FWH1) raised to ${P_G} bar - any lower and the condenser would already be hotter than FWH1 could deliver, forcing its extraction flow negative.`);
       for (let i = chain.findIndex(([n]) => n === 'P_G') - 1; i >= chain.findIndex(([n]) => n === 'P4'); i--) {
         const [, get, set, lo, hi] = chain[i];
         const [, getBelow] = chain[i + 1];
@@ -165,7 +128,7 @@
     if (peMax > 0 && P_E > peMax) {
       const [, , , peLo] = chain[chain.findIndex(([n]) => n === 'P_E')];
       P_E = snap(Math.max(peLo, peMax - GAP));
-      reasons.push(`P_E (FWH3) lowered to ${P_E} bar - above this, the shell steam is hotter than the condensate line pressure can keep liquid, so the feedwater would flash to vapor inside the FWH3 tubes.`);
+      reasons.push(`${subLabel('P_E')} (FWH3) lowered to ${P_E} bar - above this, the shell steam is hotter than the condensate line pressure can keep liquid, so the feedwater would flash to vapor inside the FWH3 tubes.`);
       for (let i = chain.findIndex(([n]) => n === 'P_E') + 1; i < chain.length; i++) {
         const [, get, set, lo, hi] = chain[i];
         const [, getAbove] = chain[i - 1];
@@ -176,18 +139,9 @@
     return reasons;
   }
 
+  // Walks the chain from the moved slider, pushing neighbors just enough to
+  // restore ordering, clamped to each slider's own [min, max].
   async function enforceOrder(changed: string) {
-    // Walk the chain in both directions from the slider that just moved, pushing
-    // neighbors out of the way only enough to restore a valid strict ordering.
-    // Each entry also carries that slider's own displayed [min,max] - without
-    // it, a large enough push (e.g. P1 dropped near its own floor) could
-    // compute a "required" value for a neighbor (P_VA) that falls outside
-    // what THAT slider can actually show. The <input> silently clamps its
-    // displayed value to its own min/max, but the JS state variable doesn't -
-    // it kept the un-clampable number, which then fed a negative/broken
-    // --pct (fill visibly detached from the thumb) AND, worse, fed that same
-    // unrealistic value into the physics solve. Clamping to bounds here
-    // means state can never diverge from what's on screen.
     const chain = getChain();
     const idx = chain.findIndex(([name]) => name === changed);
     if (idx === -1) return;
@@ -211,13 +165,11 @@
       }
     }
 
-    // Special TTD-aware boundaries: re-check AFTER the plain ordering pass above, since
-    // these need a bigger margin than the simple ordering clamp provides.
     const ttdReasons = await enforceTTDBoundaries();
 
     if (clamped || ttdReasons.length) {
       const msgs = clamped
-        ? [`Adjacent pressure(s) shifted to keep ${changed} thermodynamically valid (each stage must heat the feedwater above what the previous stage already delivered).`]
+        ? [`Adjacent pressure(s) shifted to keep ${subLabel(changed)} thermodynamically valid (each stage must heat the feedwater above what the previous stage already delivered).`]
         : [];
       flagOrder(msgs.concat(ttdReasons).join(' '));
     }
@@ -233,10 +185,7 @@
     };
   }
 
-  // ── Extraction / drain state visibility ──────────────────────────────────────
-  // X1 = extraction steam (on turbine line) - checked by default.
-  // X2 = shell drain subcooled liquid - unchecked by default.
-  // X3 = drain after booster pump - unchecked by default.
+  // Extraction/drain state visibility toggles (X1/X2/X3, see NOTES.md)
   let showExtraction: Record<string, boolean> = $state({
     A1: true, A2: true, A3: true, A4: true, A5: true,
     B1: true, B2: true, B3: true,
@@ -247,16 +196,14 @@
     G1: true, G2: true, G3: true,
   });
 
-  // ── App state ─────────────────────────────────────────────────────────────────
+  // App state
   let loading = $state(true);
   let dome    = $state<any>(null);
   let result  = $state<any>(null);
   let errMsg  = $state<string | null>(null);
 
+  // Solves off the main thread via the Worker (solverWorkerClient.js).
   async function runSolve() {
-    // The solve itself now runs on a Worker (see solverWorkerClient.js), so
-    // this await never blocks the main thread - no more macrotask-deferral
-    // trick needed to keep the page painting while it runs.
     try {
       result = await solveCycleAsync(params());
       errMsg = null;
@@ -270,19 +217,14 @@
     runSolve();
   }
 
-  // TTD moves the FWH3/vapor-branch boundary (and the FWH4/FWH1 ones) even when no
-  // pressure slider moves, so it needs its own boundary re-check rather than going
-  // straight to runSolve() the way a plain non-ordering slider would.
+  // TTD moves the P_C/P_G/P_E boundaries even without a pressure-slider edit.
   async function onTTDChange() {
     const reasons = await enforceTTDBoundaries();
     if (reasons.length) flagOrder(reasons.join(' '));
     runSolve();
   }
 
-  // Every slider is independently adjustable and several combinations are easy to walk into
-  // that are thermodynamically ugly (very low turbine efficiencies, TTD/pressure combos near
-  // the flashing boundary, etc.) - a one-click way back to a known-good cycle beats hunting
-  // down and re-dragging every slider that got touched.
+  // Restores every slider to DEFAULTS.
   function resetAll() {
     P1 = DEFAULTS.P1; T1 = DEFAULTS.T1; T3 = DEFAULTS.T3; P2 = DEFAULTS.P2; P4 = DEFAULTS.P4;
     reheat_dP_pct = DEFAULTS.reheat_dP_pct;
@@ -305,23 +247,19 @@
     runSolve();
   });
 
-  // ── Gauge value logic (geometry now lives in the shared Gauge.svelte) ───────
+  // Gauge values (geometry lives in Gauge.svelte)
   const g1Val = $derived(result ? result.eta_1 : 0);
   const g2Val = $derived(result ? Math.min(result.eta_2, 1) : 0);
 
-  // LP exhaust quality gauge - x5 < 0 is the superheated sentinel (no moisture at all,
-  // treated as a full/best-case reading); otherwise fraction is the steam quality itself.
+  // x5 < 0 is CoolProp's superheated sentinel; treat as a full/best-case reading.
   const g3Frac   = $derived(result ? (result.x5 >= 0 ? result.x5 : 1) : 0);
   const g3Warn   = $derived(!!result && result.x5 >= 0 && result.x5 < 0.85);
   const g3Accent    = $derived(g3Warn ? '#ff6459' : '#6fb2ee');
   const g3AccentDim = $derived(g3Warn ? '#c0392b' : '#2f6fa8');
 
-  // Pump power fraction (W_pumps / W_turb), on the full 0-100% scale like the other
-  // gauges - deliberately, since the whole point is to show just how small the parasitic
-  // pump load is relative to the turbine's gross output.
   const g4Raw    = $derived(result ? result.W_pumps / result.W_turb : 0);
 
-  // ── T-s diagram geometry ──────────────────────────────────────────────────────
+  // T-s diagram geometry
   const SVG_W = 500, SVG_H = 370;
   const PL = 46, PR = 10, PT = 12, PB = 36;
   const CW = SVG_W - PL - PR, CH = SVG_H - PT - PB;
@@ -342,23 +280,13 @@
     return v != null ? v.toFixed(d) : '-';
   }
 
-  // Track-fill percentage, computed reactively so the colored bar stays in sync even
-  // when a value changes programmatically (e.g. enforceOrder clamping a neighbor) rather
-  // than via direct user dragging, which is when the global --pct-sync script (attached
-  // only to native 'input' events) would otherwise miss the update.
+  // Slider track-fill percentage, clamped to [0,100].
   function pct(v: number, min: number, max: number) {
-    // Clamped defensively: enforceOrder now keeps state within each
-    // slider's own bounds, but this guards against ever rendering a
-    // gradient stop outside [0,100] (a negative or >100% --pct visibly
-    // detaches the fill from the thumb, which is invalid CSS - browsers
-    // just clamp the color-stop, so the "filled" portion silently stops
-    // matching where the thumb actually sits).
     return Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100));
   }
 
 </script>
 
-<!-- ── Page title ─────────────────────────────────────────────────────────── -->
 <div class="page-header">
   <h1 class="page-title">
     <span class="title-super" class:struck={!isSupercritical}>Supercritical</span> H<sub>2</sub>O Rankine Cycle
@@ -377,14 +305,12 @@
   {:else if errMsg}
     <div class="error-banner chamfer-panel chamfer-sm"><span>Solver error: {errMsg}</span></div>
   {:else}
-    <!-- ── Left column ─────────────────────────────────────────────────────── -->
     <div class="controls-col">
 
       {#if orderWarning}
-        <div class="order-warning chamfer-panel chamfer-sm"><span>{orderWarning}</span></div>
+        <div class="order-warning chamfer-panel chamfer-sm"><span>{@html orderWarning}</span></div>
       {/if}
 
-      <!-- Steam conditions (open by default, steam-generator-orange sliders) -->
       <details class="slider-details chamfer-panel chamfer-sm" style="--slider-color: #e8935f" open>
         <summary class="details-summary">Steam conditions</summary>
         <div class="slider-body">
@@ -423,7 +349,6 @@
         </div>
       </details>
 
-      <!-- Extraction pressures and feedwater heating (feedwater-teal sliders) -->
       <details class="slider-details chamfer-panel chamfer-sm" style="--slider-color: #1a9b73">
         <summary class="details-summary">Extraction pressures and feedwater heating</summary>
         <div class="slider-body">
@@ -458,7 +383,6 @@
         </div>
       </details>
 
-      <!-- Isentropic efficiencies (turbine-gray sliders) -->
       <details class="slider-details chamfer-panel chamfer-sm" style="--slider-color: #6b7566">
         <summary class="details-summary">Isentropic efficiencies</summary>
         <div class="slider-body">
@@ -485,7 +409,6 @@
         </div>
       </details>
 
-      <!-- Cooling / environment (condenser-blue sliders) -->
       <details class="slider-details chamfer-panel chamfer-sm" style="--slider-color: #5ba3e8">
         <summary class="details-summary">Cooling / environment</summary>
         <div class="slider-body">
@@ -519,7 +442,6 @@
         </div>
       </details>
 
-      <!-- State visibility (extraction and drain states) -->
       {#if result}
         <details class="slider-details chamfer-panel chamfer-sm">
           <summary class="details-summary">State visibility</summary>
@@ -551,7 +473,6 @@
       {/if}
     </div>
 
-    <!-- ── Right column: T-s diagram + selection panel ──────────────────── -->
     <div class="diagram-col">
       <p class="diagram-title">Temperature-Entropy (T-s) Diagram</p>
 
@@ -559,7 +480,6 @@
       <svg viewBox="0 0 {SVG_W} {SVG_H}" class="ts-svg" role="img"
            aria-label="T-s diagram of the supercritical reheat regenerative Rankine cycle">
 
-        <!-- Grid -->
         {#each T_TICKS as T}
           <line x1={PL} y1={ty(T)} x2={PL+CW} y2={ty(T)} class="grid-line" />
           <text x={PL-5} y={ty(T)+4} class="axis-tick" text-anchor="end">{T}</text>
@@ -569,14 +489,12 @@
           <text x={sx(s)} y={PT+CH+14} class="axis-tick" text-anchor="middle">{s}</text>
         {/each}
 
-        <!-- Axis lines -->
         <line x1={PL} y1={PT} x2={PL} y2={PT+CH} class="axis" />
         <line x1={PL} y1={PT+CH} x2={PL+CW} y2={PT+CH} class="axis" />
         <text x={PL-38} y={PT+CH/2} class="axis-label" text-anchor="middle"
               transform={`rotate(-90,${PL-38},${PT+CH/2})`}>T (°C)</text>
         <text x={PL+CW/2} y={SVG_H-2} class="axis-label" text-anchor="middle">s  (kJ / kg·K)</text>
 
-        <!-- Saturation dome -->
         {#if dome}
           <path d={pathD(dome.dome)} class="dome" />
         {/if}
@@ -584,47 +502,35 @@
         {#if result}
           {@const r = result}
 
-          <!-- Feedwater train: state 6 through state 15 (v2 numbering) -->
           <path d={pathD(r.fwPath)} class="path-fw" />
 
-          <!-- Steam generator: state 15 to state 1 -->
           <path d={pathD(r.steamGenPath)} class="path-steam-gen" />
 
-          <!-- HP turbine: 1 → B → 2 -->
           <path d={pathD(r.hpPath)} class="path-expand" />
 
-          <!-- Reheater: 2 → 3 -->
           <path d={pathD(r.reheatPath)} class="path-reheat" />
 
-          <!-- IP turbine: 3 → C → D → 4 -->
           <path d={pathD(r.ipPath)} class="path-expand" />
 
-          <!-- LP turbine: 4 → E → F → G → 5 -->
           <path d={pathD(r.lpPath)} class="path-expand" />
 
-          <!-- Condenser: 5 → 6 (isobar traced through CoolProp) -->
           <path d={pathD(r.condenserPath)} class="path-cond" />
 
-          <!-- FWH shell-side paths: desuperheat from extraction point to sat-vapor, then
-               horizontal condensation across the dome at constant temperature -->
           {#each r.fwhShellPaths as fp}
             <path d={pathD(fp.desupPath)} class="path-shell" />
             <line x1={sx(fp.sg)} y1={ty(fp.Tsat)} x2={sx(fp.sf)} y2={ty(fp.Tsat)} class="path-shell" />
           {/each}
 
-          <!-- Drain paths: pump compressions (A4-A5, B2-B3, F2-F3) and valve drops (C2-C3, E2-E3, G2-G3) -->
           {#each r.drainPaths as dp}
             <path d={pathD(dp)} class="path-drain" />
           {/each}
 
-          <!-- Main cycle state dots 1-15 (always shown) -->
           {#each Object.entries(r.statePoints as Record<string, [number, number, string]>) as [name, [sp, Tp, tip]]}
             <circle cx={sx(sp)} cy={ty(Tp)} r={4} class="state-pt">
               <title>{tip}</title>
             </circle>
           {/each}
 
-          <!-- Extraction / drain state dots (shown via checkbox panel) -->
           {#each Object.entries(r.extractionStatePoints as Record<string, [number, number, string]>) as [name, [sp, Tp, tip]]}
             {#if showExtraction[name]}
               <circle cx={sx(sp)} cy={ty(Tp)} r={3.5}
@@ -648,7 +554,6 @@
       </div>
       </div>
 
-      <!-- Efficiency gauges + indicators -->
       {#if result}
         <div class="gauge-grid">
           <Gauge
@@ -687,7 +592,6 @@
           />
         </div>
 
-        <!-- Key readouts -->
         <div class="readout-grid">
           <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Net electrical output</p>
@@ -739,7 +643,6 @@
           </div>
         </div>
 
-        <!-- Extraction fractions -->
         <div class="extraction-wrap chamfer-panel">
           <p class="group-label" style="margin-bottom:5px">Extraction fractions</p>
           <table class="extraction-table">
@@ -783,10 +686,7 @@
     border-radius: 50%; animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  /* Both use the smooth stainless-steel photo instead of the brushed
-     aluminum grain: these are small, text-carrying chips, and the brushed
-     photo's grain/contrast was competing with the message instead of
-     sitting quietly behind it. */
+  /* Stainless texture (not brushed aluminum) so the grain doesn't compete with the text. */
   .error-banner {
     grid-column: 1 / -1; padding: 12px 16px; color: var(--red-dim); font-size: 14px;
   }
@@ -837,7 +737,9 @@
     display: inline-block;
     width: 7px; height: 7px; border-radius: 50%;
     background: var(--slider-color, #8d9686);
-    box-shadow: 0 0 5px 1px var(--slider-color, transparent);
+    box-shadow:
+      0 0 0 1.5px color-mix(in srgb, var(--slider-color, #8d9686) 55%, transparent),
+      0 0 6px 2px color-mix(in srgb, var(--slider-color, #8d9686) 85%, transparent);
     margin-right: 8px;
   }
   .details-summary:hover { color: var(--paper); }
@@ -964,12 +866,17 @@
   .sel-dot {
     display: inline-block; width: 8px; height: 8px; border-radius: 50%;
     background: var(--amber); border: 1px solid #000; flex-shrink: 0; margin-top: 3px;
+    /* Solid ring + soft halo - a plain blur glow doesn't read on this light background. */
+    box-shadow: 0 0 0 1.5px rgba(242, 172, 65, 0.55), 0 0 7px 3px rgba(242, 172, 65, 0.85);
   }
-  .sel-dot-drain { background: var(--blue); }
+  .sel-dot-drain {
+    background: var(--blue);
+    box-shadow: 0 0 0 1.5px rgba(111, 178, 238, 0.55), 0 0 7px 3px rgba(111, 178, 238, 0.85);
+  }
   .sel-label { flex: 1; }
 
   /* Legend */
-  .diagram-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 9px; }
+  .diagram-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 9px; }
   .leg {
     font-size: 12px; color: var(--ink-dim);
     display: flex; align-items: center; gap: 5px;

@@ -1,21 +1,6 @@
 <script lang="ts">
   import Gauge from './Gauge.svelte';
-  // Carnot cycle interactive explainer
-  // 1st law efficiency: eta_th = 1 - Tc/Th
-  //   Source: Moran, Shapiro, Boettner & Bailey, "Fundamentals of Engineering
-  //   Thermodynamics," 8th ed., Ch. 5.3 (Carnot efficiency from the Kelvin
-  //   temperature scale / 2nd law).
-  // 2nd law (exergetic) efficiency: eta_II = W_net / Ex_in
-  //   Source: Moran et al., Ch. 7 (Exergy Analysis), eta_II = Wdot / Exdot_heat.
-  //   For a Carnot engine this is identically 100% because the cycle is fully
-  //   reversible (zero exergy destruction) - that's why it's the reference
-  //   cycle for 2nd law comparisons (Cengel & Boles, "Thermodynamics: An
-  //   Engineering Approach," Ch. 8).
-  // Exergy of heat input: Ex_in = Q_H * (1 - T0/T_H), with T0 = T_C
-  //   Source: Moran et al., Ch. 7.1, exergy transfer accompanying heat
-  //   transfer, Exdot_heat = Qdot * (1 - T0/T). Using T_C as the reference
-  //   environment T0 is the standard assumption when no separate ambient
-  //   temperature is specified.
+  // Carnot cycle interactive explainer. Formula sources: NOTES.md.
 
   let TH = $state(800); // hot reservoir temperature, K
   let TC = $state(300); // cold reservoir temperature, K

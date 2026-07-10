@@ -1,7 +1,4 @@
-// Promise-based facade over rankineSolver.worker.js - callers await these
-// exactly like they'd await the direct (main-thread) solver calls, but the
-// actual computation happens on the worker thread so the page stays
-// responsive (painting, compositing, CSS animations) while it runs.
+// Promise-based facade over rankineSolver.worker.js.
 let worker = null;
 let nextId = 1;
 const pending = new Map();

@@ -1,10 +1,4 @@
-// Runs the CoolProp-backed solver off the main thread. The solve is a few
-// hundred synchronous PropsSI calls into WASM - measured at ~300-400ms per
-// call - and while that runs, a normal (main-thread) call blocks *everything*:
-// no repaint, no compositing, no CSS animation, regardless of how cheap
-// those animations are individually. Moving the computation itself into a
-// Worker is the only way to keep the page alive during that stretch; no
-// amount of CSS tuning on the main thread can fix a main-thread block.
+// Runs the CoolProp-backed solver off the main thread. See NOTES.md.
 import { init, solveCycle, getDome, minPC, minPG, maxPE } from './rankineSolver.js';
 
 self.onmessage = async (e) => {

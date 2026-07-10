@@ -1,9 +1,6 @@
 <script lang="ts">
-  // Reusable analog instrument gauge: machined bezel, recessed dial, tick
-  // ring, sweep arc, tapered needle with counterweight + chrome hub, glass
-  // glare, and a paired digital LCD readout underneath. Semicircular sweep,
-  // 0% at the left (180deg) to 100% at the right (0deg), over the top -
-  // geometry mirrors the layout the two cycle pages already relied on.
+  // Reusable analog instrument gauge with LCD readout. Semicircular sweep,
+  // 0% at left (180deg) to 100% at right (0deg), over the top.
   let {
     value,
     label,
@@ -25,11 +22,9 @@
     dangerBelow?: number | null;
   } = $props();
 
-  // Unique per-instance id suffix so multiple gauges on one page don't
-  // collide over <defs> ids (SVG ids are document-global).
+  // Per-instance id suffix so multiple gauges don't collide over <defs> ids.
   const uid = Math.random().toString(36).slice(2, 9);
-  // Negative delay starts each gauge's idle wiggle at a random point in its
-  // cycle, so multiple gauges on one page don't all tick in lockstep.
+  // Randomized so gauges don't all wiggle in lockstep.
   const wiggleDelay = -(Math.random() * 1.4).toFixed(2);
 
   const cx = 80, cy = 92, R = 52, BEZEL = R + 14;
@@ -178,11 +173,7 @@
   }
   .lcd-unit { font-size: 11px; opacity: 0.75; margin-left: 1px; }
 
-  /* Idle jiggle, like a needle settling against friction. will-change hints
-     the browser to give this its own compositing layer, so each frame only
-     has to re-composite the small needle instead of repainting the whole
-     panel behind it (textured background + clip-path chamfer) - that
-     mismatch was likely why this read as choppy on mobile in particular. */
+  /* Idle jiggle; will-change keeps it on its own compositing layer for smoother mobile perf. */
   .needle-grp {
     transform-origin: 80px 92px;
     animation: needle-jiggle 1.4s ease-in-out infinite;
