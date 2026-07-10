@@ -28,6 +28,9 @@
   // Unique per-instance id suffix so multiple gauges on one page don't
   // collide over <defs> ids (SVG ids are document-global).
   const uid = Math.random().toString(36).slice(2, 9);
+  // Negative delay starts each gauge's idle wiggle at a random point in its
+  // cycle, so multiple gauges on one page don't all tick in lockstep.
+  const wiggleDelay = -(Math.random() * 1.4).toFixed(2);
 
   const cx = 80, cy = 92, R = 52, BEZEL = R + 14;
 
@@ -130,13 +133,16 @@
 
     <!-- Sweep track + fill -->
     <path d={trackPath} fill="none" stroke="#b7bcb8" stroke-width="7" stroke-linecap="round" />
-    <path d={fillPath} fill="none" stroke={accent} stroke-width="7" stroke-linecap="round" style="filter: drop-shadow(0 0 3px {accent}99)" />
+    <!-- Plain stroke, no drop-shadow filter: fillPath's shape changes on every
+         solve, and re-rasterizing a blur filter each time (x4 gauges) was a
+         real contributor to update lag - not worth the subtle glow. -->
+    <path d={fillPath} fill="none" stroke={accent} stroke-width="7" stroke-linecap="round" />
 
     <!-- Glass glare -->
     <path d={bezelPath} fill="url(#glass-{uid})" clip-path="url(#clip-{uid})" />
 
     <!-- Needle -->
-    <g class="needle-grp">
+    <g class="needle-grp" style="animation-delay: {wiggleDelay}s">
       <polygon points={needlePoly} fill={accentDim} stroke="#0a0b0d" stroke-width="0.5" />
       <circle cx={cx} cy={cy} r="6.5" fill="url(#hub-{uid})" stroke="#0a0b0d" stroke-width="0.6" />
       <circle cx={cx - 1.3} cy={cy - 1.8} r="1.4" fill="#fff" opacity="0.75" />
@@ -172,15 +178,20 @@
   }
   .lcd-unit { font-size: 11px; opacity: 0.75; margin-left: 1px; }
 
-  /* Subtle idle jiggle, like a needle settling against friction */
+  /* Idle jiggle, like a needle settling against friction. will-change hints
+     the browser to give this its own compositing layer, so each frame only
+     has to re-composite the small needle instead of repainting the whole
+     panel behind it (textured background + clip-path chamfer) - that
+     mismatch was likely why this read as choppy on mobile in particular. */
   .needle-grp {
     transform-origin: 80px 92px;
-    animation: needle-jiggle 2.6s ease-in-out infinite;
+    animation: needle-jiggle 1.4s ease-in-out infinite;
+    will-change: transform;
   }
   @keyframes needle-jiggle {
     0%, 100% { transform: rotate(0deg); }
-    25%      { transform: rotate(-1.6deg); }
-    75%      { transform: rotate(1.6deg); }
+    25%      { transform: rotate(-1.5deg); }
+    75%      { transform: rotate(1.5deg); }
   }
 
   .gauge-alarm {

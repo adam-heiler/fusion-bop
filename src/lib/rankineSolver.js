@@ -15,7 +15,7 @@ let _dome = null;
 
 // ── Per-solve memoization of CoolProp lookups ────────────────────────────────
 // PropsSI is a pure function of (output, name1, val1, name2, val2) for a fixed fluid, so
-// caching on that exact 5-tuple is numerically lossless — every hit returns the identical
+// caching on that exact 5-tuple is numerically lossless - every hit returns the identical
 // IEEE-754 double the underlying call would have. Profiling one solveCycle at default
 // sliders showed 508 PropsSI calls of which 75 (14.8%) are exact repeats (profile_solver.py);
 // caching removes exactly those, verified bit-identical for all outputs (verify_cache_identical.py).
@@ -33,7 +33,7 @@ export function getDome() { return _dome; }
 
 // ── Slider-clamp helpers ────────────────────────────────────────────────────
 // These let the UI enforce physically valid pressure combinations WITHOUT duplicating
-// CoolProp access logic in the Svelte component. Both solve numerically (cheap — a few
+// CoolProp access logic in the Svelte component. Both solve numerically (cheap - a few
 // CoolProp calls each) for the minimum shell pressure that keeps the corresponding
 // extraction fraction (c or g) from going negative, since the deaerator and condenser
 // outlets are saturated liquid with NO TTD subtracted, unlike every FWH-to-FWH boundary
@@ -56,7 +56,7 @@ export function minPC(P_D, TTD, eta_pump, Pfw = 250) {
 // minPG now takes the condenser saturation TEMPERATURE directly (T6C_est, °C), because
 // under the Level-3 ε-NTU condenser model the condenser pressure is an emergent result of
 // the cycle heat load, not a simple ambient formula. The component passes the most recent
-// solved T6C (one drag-step stale — an excellent estimate since sliders move incrementally);
+// solved T6C (one drag-step stale - an excellent estimate since sliders move incrementally);
 // on first load it passes a nominal estimate. The clamp only needs T6C to bound P_G so that
 // FWH1's feedwater outlet stays above the condensate + condensate-pump delivery (g ≥ 0).
 export function minPG(T6C_est, TTD, eta_pump, Pcond = 5) {
@@ -72,6 +72,22 @@ export function minPG(T6C_est, TTD, eta_pump, Pcond = 5) {
     if (h8p < h8) lo = mid; else hi = mid;
   }
   return hi;
+}
+
+// Maximum P_E (FWH3 shell/bleed pressure) such that FWH3's TTD-determined feedwater outlet
+// temperature stays BELOW the condensate pump's saturation temperature. P_G and P_F are
+// safe by construction (their own slider maxima, 3 bar and 5 bar, never exceed Pcond = 5
+// bar, so satT(P) - TTD < satT(Pcond) always holds) - but P_E's range extends to 8 bar. Once
+// satT(P_E) - TTD exceeds satT(Pcond), fwhH's H,P,T lookup is being asked for a point that
+// sits below the saturation pressure at that temperature, i.e. superheated vapor, not
+// subcooled liquid: the FWH outlet snaps onto the vapor branch of the dome. Unlike minPC/
+// minPG (bisected, because the feedwater pump's enthalpy rise doesn't invert analytically),
+// this one inverts in closed form: Psat(T) is monotonic, so the limiting pressure is exactly
+// Psat(satT(Pcond) + TTD).
+export function maxPE(TTD, Pcond = 5) {
+  const PcondPa = Pcond * BAR;
+  const Tlimit = satT(PcondPa) + TTD;
+  return Q('P', 'T', Tlimit, 'Q', 0) / BAR;
 }
 
 function Q(out, n1, v1, n2, v2) {
@@ -129,7 +145,7 @@ function iso(P, h_in, h_out, N) {
 }
 
 // Compression path: N+1 CoolProp points with linear-h + geometric-P interpolation
-// (used for pumps only — entropy is monotonically well-behaved for pump compression)
+// (used for pumps only - entropy is monotonically well-behaved for pump compression)
 function seg(h_in, P_in, h_out, P_out, N) {
   const pts = [];
   for (let i = 0; i <= N; i++) {
@@ -143,7 +159,7 @@ function seg(h_in, P_in, h_out, P_out, N) {
 
 // Turbine expansion path: parameterized by entropy (guarantees monotonically increasing s).
 // Using linear-h near the pseudo-critical region causes entropy to decrease mid-segment
-// because the 250-bar isobar forms an S-curve — parameterizing by s avoids that artifact.
+// because the 250-bar isobar forms an S-curve - parameterizing by s avoids that artifact.
 function turbSeg(s_in, P_in, s_out, P_out, N) {
   const pts = [];
   for (let i = 0; i <= N; i++) {
@@ -179,7 +195,7 @@ export function solveCycle(p) {
   // T_cw_in = wet-bulb + cooling-tower approach (approach = cold-water-minus-wet-bulb;
   // source: cooling-tower approach/range definitions, ScienceDirect "Cooling Tower"
   // overview; Deppmann "Cooling Tower Temperatures"). The condenser SATURATION temperature
-  // is NOT known yet — under the Level-3 ε-NTU model it is an emergent result of the cycle
+  // is NOT known yet - under the Level-3 ε-NTU model it is an emergent result of the cycle
   // heat load and is solved for below. cp of the circulating water is evaluated once near
   // its own conditions (~1.5 bar liquid).
   const T_wb = wetbulb(p.T0, p.RH);
@@ -237,7 +253,7 @@ export function solveCycle(p) {
   const Pcond = p.P_condpump * BAR;
 
   // Extraction point T-s coordinates for diagram (all pressures now in scope).
-  // Stream A is tapped BEFORE the HP turbine, so state a1 IS state 1 — it is NOT a bleed
+  // Stream A is tapped BEFORE the HP turbine, so state a1 IS state 1 - it is NOT a bleed
   // expanded down to P_VA (source: rankinecycle_v2.xlsx "states" sheet: "a1 same state as
   // 1"; "streams" sheet: "a: extraction before main stream enters hp turbine"). The steam
   // that reaches the FWH6 shell is state a3 (after the reheater + Valve A), handled below.
@@ -258,7 +274,7 @@ export function solveCycle(p) {
 
   // TTD-determined FWH outlet enthalpies (flow-independent property lookups).
   // Variable names match v2 state numbering (rankinecycle_v2.xlsx): old state 7 (hotwell)
-  // dropped — merged into new state 6. Old 8->7, 9->8, 10->9, 11->10, 12->11, 13->12,
+  // dropped - merged into new state 6. Old 8->7, 9->8, 10->9, 11->10, 12->11, 13->12,
   // 14->13, 15->14, 16->15. Prime (') suffix denotes intermediate FWH outlet before mixing.
   const h7p  = fwhH(P_FWH1, Pcond, TTD);  // FWH1 feedwater outlet (new state 7')
   const h8p  = fwhH(P_FWH2, Pcond, TTD);  // FWH2 feedwater outlet (new state 8')
@@ -311,14 +327,14 @@ export function solveCycle(p) {
   // KEY CORRECTION vs. an earlier version: the reheater COLD side carries m-a-b, not m-a.
   // Stream b bleeds off inside the HP turbine (states 1' -> b1) BEFORE the HP exhaust
   // reaches the reheater, so states 2 and 3 both carry mass flow m-a-b
-  // (source: rankinecycle_v2.xlsx "states" sheet — states 2 and 3 list mass flow "m-a-b").
+  // (source: rankinecycle_v2.xlsx "states" sheet - states 2 and 3 list mass flow "m-a-b").
   // Charging (m-a) to the reheater cold side silently discarded b*(h3-h2) of energy and
   // over-extracted stream a; the whole-plant First Law then failed to close by exactly
-  // that amount (source: audit_reheater_balance.py — 51.49 MW residual = b*(h3-h2)).
+  // that amount (source: audit_reheater_balance.py - 51.49 MW residual = b*(h3-h2)).
   //
   // Stream a is tapped BEFORE the HP turbine at state 1 (source: rankinecycle_v2.xlsx
-  // "streams" sheet — "a: extraction before main stream enters hp turbine"; and "states"
-  // sheet — "a1 same state as 1"). It is NOT a turbine bleed: it flows a1 -> reheater
+  // "streams" sheet - "a: extraction before main stream enters hp turbine"; and "states"
+  // sheet - "a1 same state as 1"). It is NOT a turbine bleed: it flows a1 -> reheater
   // (hot side) -> Valve A -> FWH6 shell. Reheater hot-side balance:
   //   a*h1 + (m-a-b)*h2 = a*h_a2 + (m-a-b)*h3  ->  h_a2 = h1 - (m-a-b)*(h3-h2)/a.
   //
@@ -372,7 +388,7 @@ export function solveCycle(p) {
   // Q_cond depends on P6 (through h5, h6, the FWH1 extraction g, and flow_cond), while
   // ṁ_cw, C_cw and ε are FIXED per solve (m is P6-independent). So this is a scalar fixed
   // point on T_cond. It is a strong contraction (residual ratio ≈ 0.03 per iteration,
-  // converges in ≤2 iterations across a 540-case sweep — level3_prototype.py) and the
+  // converges in ≤2 iterations across a 540-case sweep - level3_prototype.py) and the
   // whole-plant First Law closes to 0.000000 MW at the converged pressure
   // (validate_level3.py). The loop is BOUNDED (fixed max passes) so it can never hang.
   //
@@ -412,8 +428,14 @@ export function solveCycle(p) {
   flow_cond = flow_fwh1 - g;
   Q_cond = flow_cond * h5 + g * h_g2 - flow_fwh1 * h6;
   const s5 = Q('S', 'P', P5, 'H', h5);
-  const T5 = T6C;                              // condenser saturation temp
   const x5 = Q('Q', 'P', P5, 'H', h5);         // LP exhaust steam quality (-1 if superheated)
+  // Wet steam is isothermal along the condenser isobar, so T6C (already the converged
+  // saturation temp) is exact and free. But a low enough eta_LP can leave the LP exhaust
+  // superheated (x5 < 0) - state 5 then sits ABOVE the dome, hotter than T6C, and needs its
+  // own H,P lookup or it plots at the wrong T entirely (off of both the dome and the actual
+  // desuperheat-then-condense curve traced by condenserPath below, which is built from real
+  // H,P points at every step and was never wrong - only this single marker was).
+  const T5 = x5 >= 0 ? T6C : Q('T', 'P', P5, 'H', h5) - C2K;
 
   // Emergent circulating-water metrics (readouts, not inputs). range = CW temperature rise
   // (set by heat load and flow), TTD = condenser terminal difference (steam saturation temp
@@ -444,11 +466,11 @@ export function solveCycle(p) {
   // Ex_sg = external exergy delivered to the working fluid by the steam generator (boiler):
   //   Ex_sg = m·[(h1−h15) − T0·(s1−s15)]   (flow-exergy increase across the boiler).
   // The reheater is internally heated by extraction stream a (working-fluid-to-working-fluid),
-  // so it adds NO external exergy — stream a was already heated in the boiler as part of m,
+  // so it adds NO external exergy - stream a was already heated in the boiler as part of m,
   // and its exergy is already inside the term below. An earlier version added a reheat term
   // to Ex_sg only (not to eta_2's denominator): that double-counted internal reheat (~78.7 MW),
   // so the readout and the gauge disagreed and W_net/Ex_sg (~71.5%) fell below the true
-  // eta_2 (~81.6%) — source: diagnose.py. Defining Ex_sg once and dividing keeps them equal.
+  // eta_2 (~81.6%) - source: diagnose.py. Defining Ex_sg once and dividing keeps them equal.
   // (State 15 = boiler inlet, was old state 16 before v2 renumbering.)
   const T0K = p.T0 + C2K;
   const s15_si = Q('S', 'P', Pfw, 'H', h15); // J/kg/K
@@ -502,13 +524,13 @@ export function solveCycle(p) {
     reheatPath.push([Q('S', 'P', P3, 'T', Tp) / 1000, Tp - C2K]);
   }
 
-  // Turbine expansion paths — entropy-parameterized (turbSeg) to avoid the
+  // Turbine expansion paths - entropy-parameterized (turbSeg) to avoid the
   // "curved inward" artifact caused by the 250-bar pseudo-critical S-curve.
   // HP turbine expansion: state 1 -> B bleed (P_B) -> state 2 exhaust (P2).
   // Stream A is tapped BEFORE the HP turbine (a1 = state 1, source: rankinecycle_v2.xlsx
   // streams sheet "a: extraction before main stream enters hp turbine"), so it is NOT a
   // waypoint on this expansion line. Routing the path through the old A point drew a
-  // spurious constant-entropy vertical drop, because s_A_ex now equals s1 — the first leg
+  // spurious constant-entropy vertical drop, because s_A_ex now equals s1 - the first leg
   // turbSeg(s1 -> s1) held entropy pinned at s1 while pressure fell 250->117 bar
   // (verified in diagnose.py: seven points all at s = 6.1416 kJ/kg·K). B (P_B = 100 bar,
   // between P1 and P2) is a genuine on-turbine bleed and stays.
@@ -528,7 +550,7 @@ export function solveCycle(p) {
     ...turbSeg(s_G_ex*1000, P_G, s5,          P5,  8).slice(1),
   ];
 
-  // Feedwater train T-s coordinates — v2 numbering.
+  // Feedwater train T-s coordinates - v2 numbering.
   // State 6 = combined condenser+hotwell outlet (sat. liquid at P6).
   // State 7 = condensate pump outlet. States 8-15 follow from there.
   const s6v   = s6 / 1000;                              // new state 6
@@ -555,7 +577,7 @@ export function solveCycle(p) {
   // Condenser: isobar from LP exhaust to sat liquid at P6
   const condenserPath = iso(P6, h5, h6, 8);
 
-  // Feedwater train — isobars for heating legs, seg() for pump compressions.
+  // Feedwater train - isobars for heating legs, seg() for pump compressions.
   // State 10→11 is a mixing jump across pressures (Pcond→P_DA in deaerator); bridge with
   // a single deaerator-outlet point so pathD draws one straight bridging segment rather
   // than producing a phantom iso segment at the wrong pressure.
@@ -588,9 +610,9 @@ export function solveCycle(p) {
     const sg   = Q('S', 'P', P, 'Q', 1) / 1000;
     const h_sg = Q('H', 'P', P, 'Q', 1);
     // If the extraction steam is already two-phase at the shell pressure, there is no
-    // superheated region to desuperheat — condensation starts at the entry entropy inside
+    // superheated region to desuperheat - condensation starts at the entry entropy inside
     // the dome. This is the case for FWH6, whose steam has passed through the reheater and
-    // Valve A and enters wet (h_a3 << h_sat_vapor at P_VA — source: validate_v2.py:
+    // Valve A and enters wet (h_a3 << h_sat_vapor at P_VA - source: validate_v2.py:
     // h_a3 = 1731.8 kJ/kg < h_g(117 bar) = 2691.9 kJ/kg, quality ~0.21). Drawing an
     // iso(hEx -> h_sg) leg here would sweep backwards toward the sat-vapor line.
     if (hEx <= h_sg) {
@@ -601,7 +623,7 @@ export function solveCycle(p) {
     return { name, Tsat, sf, sg, sEx, TEx, desupPath };
   });
 
-  // All 15 main cycle state points — always shown on the T-s diagram.
+  // All 15 main cycle state points - always shown on the T-s diagram.
   const statePoints = {
     1:  [s1/1000,  p.T1,    `State 1: Boiler outlet / HP turbine inlet, ${p.T1}°C, ${p.P1} bar`],
     2:  [s2/1000,  T2-C2K,  'State 2: HP turbine exhaust / reheater inlet'],
@@ -620,14 +642,14 @@ export function solveCycle(p) {
     15: [s15v,     T15v,    `State 15: Boiler inlet, ${T15v.toFixed(1)}°C`],
   };
 
-  // Extraction and drain state points — shown via the checkbox panel.
+  // Extraction and drain state points - shown via the checkbox panel.
   // X1 = extraction steam entering the FWH shell (on the turbine line).
   // X2 = shell drain (subcooled liquid leaving the shell at shell pressure).
   // X3 = drain after the associated booster pump (where applicable).
   // A-stream: five panel states a1..a5 (source: rankinecycle_v2.xlsx "states" sheet).
   // a1 = state 1 (s_A_ex/T_A_ex above); a2 = reheater outlet (at ~P1, since Valve A is the
   // only pressure-dropping device between a2 and the FWH6 shell); a3 = Valve A outlet
-  // (isenthalpic, at P_VA — enters the shell already two-phase); a4 = shell drain; a5 =
+  // (isenthalpic, at P_VA - enters the shell already two-phase); a4 = shell drain; a5 =
   // after pump A.
   const s_A2 = Q('S','P',P1,   'H',h_a2)/1000; const T_A2 = Q('T','P',P1,   'H',h_a2)-C2K;
   const s_A3 = Q('S','P',P_VA, 'H',h_a3)/1000; const T_A3 = Q('T','P',P_VA, 'H',h_a3)-C2K;

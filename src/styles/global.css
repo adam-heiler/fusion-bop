@@ -32,7 +32,17 @@
   --red: #ff6459;
   --red-dim: #c0392b;
   --chamfer: 14px;
+  /* Single high-res photo, never tiled - background-size: cover on every
+     surface that uses it. A repeated tile would show a seam wherever the
+     texture's own lighting doesn't match itself edge-to-edge; not repeating
+     sidesteps the problem entirely instead of trying to author a seamless
+     tile. */
   --aluminum: url('/textures/brushed-aluminum.webp');
+  /* Smooth, grain-free polished-steel gradient - used where a stretched or
+     small crop needs to stay clean (buttons, popups), since it has no
+     directional grain to reveal scaling/seam artifacts the way the brushed
+     aluminum photo would. */
+  --stainless: url('/textures/stainless-steel.webp');
 
   --font-display: 'Rajdhani', 'Segoe UI', sans-serif;
   --font-mono: 'Share Tech Mono', 'JetBrains Mono', monospace;
@@ -55,6 +65,19 @@ body {
 h1, h2, h3, h4 {
   font-family: var(--font-display);
   letter-spacing: 0.01em;
+}
+
+/* Shared section-title look (RankineCycle.svelte's scoped .page-title
+   mirrors this - kept in sync by hand since Svelte scoping means the two
+   can't share one rule). */
+.page-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--paper);
+  letter-spacing: 0.02em;
+  margin: 0 0 16px;
+  line-height: 1.3;
 }
 
 /* Numeric / instrument text everywhere */
@@ -84,9 +107,26 @@ h1, h2, h3, h4 {
   clip-path: polygon(calc(var(--cf) - 1.5px) 0, 100% 0, 100% calc(100% - (var(--cf) - 1.5px)), calc(100% - (var(--cf) - 1.5px)) 100%, 0 100%, 0 calc(var(--cf) - 1.5px));
   background-image: linear-gradient(165deg, var(--steel-650), var(--steel-800) 72%), var(--aluminum);
   background-repeat: no-repeat, no-repeat;
-  background-size: cover, cover;
+  background-size: 100% 100%, cover;
   background-position: center, center;
   background-blend-mode: overlay;
+}
+/* Modifier: chamfer all four corners instead of just the opposing pair. */
+.chamfer-all {
+  clip-path: polygon(
+    var(--cf) 0, calc(100% - var(--cf)) 0,
+    100% var(--cf), 100% calc(100% - var(--cf)),
+    calc(100% - var(--cf)) 100%, var(--cf) 100%,
+    0 calc(100% - var(--cf)), 0 var(--cf)
+  );
+}
+.chamfer-all::before {
+  clip-path: polygon(
+    calc(var(--cf) - 1.5px) 0, calc(100% - (var(--cf) - 1.5px)) 0,
+    100% calc(var(--cf) - 1.5px), 100% calc(100% - (var(--cf) - 1.5px)),
+    calc(100% - (var(--cf) - 1.5px)) 100%, calc(var(--cf) - 1.5px) 100%,
+    0 calc(100% - (var(--cf) - 1.5px)), 0 calc(var(--cf) - 1.5px)
+  );
 }
 .chamfer-panel > * {
   position: relative;
@@ -97,45 +137,24 @@ h1, h2, h3, h4 {
 .chamfer-sm { --cf: 6px; }
 
 /* ── Drafting-paper panel ─────────────────────────────────────────────────
-   A bright vellum sheet "pinned" onto a light aluminum mat, for hosting
-   reference diagrams/drawings against a paper-and-grid backdrop. The mat
-   uses the same --steel-* panel tokens as everything else (cool light
-   gray), while the paper itself stays warm cream - the two are told apart
-   by temperature/material, not by a light-vs-dark jump. */
+   A near-white sheet mounted on a chamfered aluminum mat (.drafting-mat
+   uses the .chamfer-panel treatment directly, so it matches every other
+   panel exactly). Thin corner registration marks stand in for the earlier
+   tape-corners look - a plain technical-drawing convention rather than a
+   corkboard one. */
 .drafting-mat {
-  /* cover, not tiled: tiling would repeat the photo's own soft vertical
-     light gradient as a visible seam on a panel this tall. The panel can
-     slightly exceed the texture's native 1536px width on very large
-     viewports, but that upscale is minor (~10%) and unnoticeable, unlike a
-     seam. */
-  background-image: linear-gradient(165deg, var(--steel-600), var(--steel-800)), var(--aluminum);
-  background-repeat: no-repeat, no-repeat;
-  background-size: 100% 100%, cover;
-  background-position: center, center;
-  background-blend-mode: overlay, normal;
   padding: 18px;
-  border-radius: 3px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
   margin-bottom: 28px;
 }
 .drafting-panel {
   position: relative;
-  background:
-    linear-gradient(rgba(90, 110, 130, 0.09) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(90, 110, 130, 0.09) 1px, transparent 1px),
-    #f5f0df;
-  background-size: 24px 24px, 24px 24px, auto;
-  border: 1px solid #a89a76;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
-  padding: 22px 22px 16px;
-}
-.drafting-panel::before {
-  content: '';
-  position: absolute;
-  inset: 9px;
-  z-index: 0;
-  border: 1px solid #c2b48c;
-  pointer-events: none;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.2 0 0 0 0.22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-color: #fcfbf7;
+  background-size: 200px 200px;
+  border: 1px solid #d8d3c4;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  padding: 26px 26px 18px;
 }
 .drafting-panel > * {
   position: relative;
@@ -145,28 +164,73 @@ h1, h2, h3, h4 {
   display: block;
   width: 100%;
   height: auto;
-  filter: drop-shadow(0 2px 4px rgba(60, 50, 20, 0.15));
+  filter: drop-shadow(0 2px 4px rgba(60, 50, 20, 0.1));
 }
-.drafting-tape {
+/* Continuous drawing-frame border (the classic ANSI/ISO "trim line"), plus
+   small crop/registration marks right at the sheet corners outside it - two
+   layered cues instead of one, since neither alone read clearly as "this is
+   a technical drawing" rather than just a photo with a border. */
+.drafting-frame {
   position: absolute;
-  width: 64px;
-  height: 24px;
-  background: rgba(255, 246, 200, 0.6);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  inset: 14px;
+  border: 1.5px solid #b8ad91;
+  pointer-events: none;
+  z-index: 1;
 }
+.drafting-corner {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #8a8064;
+  pointer-events: none;
+}
+.drafting-corner.tl { top: 4px; left: 4px; border-width: 1.5px 0 0 1.5px; }
+.drafting-corner.tr { top: 4px; right: 4px; border-width: 1.5px 1.5px 0 0; }
+.drafting-corner.bl { bottom: 4px; left: 4px; border-width: 0 0 1.5px 1.5px; }
+.drafting-corner.br { bottom: 4px; right: 4px; border-width: 0 1.5px 1.5px 0; }
+
+/* Title block: a proper bordered ANSI-style cell grid rather than a plain
+   line of text, so the sheet reads unmistakably as an engineering drawing. */
 .drafting-titleblock {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-top: 14px;
-  padding-top: 10px;
-  border-top: 1px solid #c2b48c;
+  display: grid;
+  grid-template-columns: 1fr 130px;
+  margin-top: 16px;
+  border: 1.5px solid #b8ad91;
   font-family: var(--font-mono);
-  font-size: 11px;
-  color: #6b5f42;
+  color: #6b6248;
+}
+.tb-title {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 12px;
+  border-right: 1.5px solid #b8ad91;
+}
+.tb-title .tb-line1 {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #4a4432;
+}
+.tb-title .tb-line2 {
+  font-size: 10px;
   letter-spacing: 0.03em;
 }
+.tb-meta { display: flex; flex-direction: column; }
+.tb-row {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+}
+.tb-row:not(:last-child) { border-bottom: 1.5px solid #b8ad91; }
+.tb-row .tb-key { color: #8a8064; }
+.tb-row .tb-val { font-weight: 700; color: #4a4432; }
 
 /* LCD-style digital readout chip - a light, matte calculator/e-ink screen
    rather than a glowing black display, to match the light aluminum theme.
@@ -187,7 +251,7 @@ h1, h2, h3, h4 {
   letter-spacing: 0.03em;
 }
 
-/* ── Cross-browser range slider — recessed groove + machined knob ────────── */
+/* ── Cross-browser range slider - recessed groove + machined knob ────────── */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -210,24 +274,28 @@ input[type="range"]::-webkit-slider-runnable-track {
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 17px;
-  height: 17px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: radial-gradient(circle at 34% 28%, #f5f6f3 0%, #a7adb3 45%, #4c525a 100%);
-  border: 1px solid #14161a;
-  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.04);
-  margin-top: -5px;
+  background-image: url('/buttons/knob-silver.png');
+  background-size: cover;
+  /* box-shadow, not filter: drop-shadow - a filter graph has to be
+     re-rasterized on every frame of a transform:scale transition, which is
+     what made this janky (especially on mobile GPUs). box-shadow is cheap
+     to animate and composites independently of the transform. */
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.5);
+  margin-top: -6.5px;
   cursor: pointer;
-  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
-              box-shadow 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.15s ease;
 }
 input[type="range"]:hover::-webkit-slider-thumb {
   transform: scale(1.15);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6), 0 0 0 6px color-mix(in srgb, var(--slider-color, #14b8a6) 28%, transparent);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.5), 0 0 0 6px color-mix(in srgb, var(--slider-color, #14b8a6) 28%, transparent);
 }
 input[type="range"]:active::-webkit-slider-thumb {
   transform: scale(1.35);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.65), 0 0 0 10px color-mix(in srgb, var(--slider-color, #14b8a6) 34%, transparent);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.5), 0 0 0 10px color-mix(in srgb, var(--slider-color, #14b8a6) 34%, transparent);
 }
 input[type="range"]::-moz-range-track {
   height: 8px;
@@ -242,23 +310,24 @@ input[type="range"]::-moz-range-progress {
   background: var(--slider-color, #14b8a6);
 }
 input[type="range"]::-moz-range-thumb {
-  width: 17px;
-  height: 17px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: radial-gradient(circle at 34% 28%, #f5f6f3 0%, #a7adb3 45%, #4c525a 100%);
-  border: 1px solid #14161a;
-  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(0, 0, 0, 0.22);
+  border: none;
+  background-image: url('/buttons/knob-silver.png');
+  background-size: cover;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.5);
   cursor: pointer;
-  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
-              box-shadow 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.15s ease;
 }
 input[type="range"]:hover::-moz-range-thumb {
   transform: scale(1.15);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6), 0 0 0 6px color-mix(in srgb, var(--slider-color, #14b8a6) 28%, transparent);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.5), 0 0 0 6px color-mix(in srgb, var(--slider-color, #14b8a6) 28%, transparent);
 }
 input[type="range"]:active::-moz-range-thumb {
   transform: scale(1.35);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.65), 0 0 0 10px color-mix(in srgb, var(--slider-color, #14b8a6) 34%, transparent);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.5), 0 0 0 10px color-mix(in srgb, var(--slider-color, #14b8a6) 34%, transparent);
 }
 
 /* Scrollbar (webkit) to match the theme */

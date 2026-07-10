@@ -5,6 +5,8 @@ interface Props {
   title: string;
 }
 const { title } = Astro.props;
+const path = Astro.url.pathname;
+const isCurrent = (href: string) => path === href || (href !== '/' && path.startsWith(href));
 ---
 <html lang="en">
   <head>
@@ -27,12 +29,12 @@ const { title } = Astro.props;
       </button>
 
       <div class="nav-links" id="nav-links">
-        <a href="/">Overview</a>
-        <a href="/thermo-background">Thermodynamics Background</a>
-        <a href="/tokamak-systems">Tokamak Systems</a>
-        <a href="/rankine">H<sub>2</sub>O Rankine</a>
-        <a href="/co2-brayton">CO<sub>2</sub>&nbsp;Brayton</a>
-        <a href="/he-brayton">He Brayton</a>
+        <a href="/" aria-current={isCurrent('/') ? 'page' : undefined}>Overview</a>
+        <a href="/thermo-background" aria-current={isCurrent('/thermo-background') ? 'page' : undefined}>Thermodynamics Background</a>
+        <a href="/tokamak-systems" aria-current={isCurrent('/tokamak-systems') ? 'page' : undefined}>Tokamak Systems</a>
+        <a href="/rankine" aria-current={isCurrent('/rankine') ? 'page' : undefined}>H<sub>2</sub>O Rankine</a>
+        <a href="/co2-brayton" aria-current={isCurrent('/co2-brayton') ? 'page' : undefined}>CO<sub>2</sub>&nbsp;Brayton</a>
+        <a href="/he-brayton" aria-current={isCurrent('/he-brayton') ? 'page' : undefined}>He Brayton</a>
       </div>
     </nav>
     <div class="nav-scrim" id="nav-scrim"></div>
@@ -103,8 +105,9 @@ const { title } = Astro.props;
       linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 40%),
       linear-gradient(180deg, var(--steel-650), var(--steel-800)),
       var(--aluminum);
-    background-repeat: no-repeat, no-repeat, repeat;
-    background-size: 100% 100%, 100% 100%, 700px auto;
+    background-repeat: no-repeat, no-repeat, no-repeat;
+    background-size: 100% 100%, 100% 100%, cover;
+    background-position: center, center, center;
     background-blend-mode: normal, overlay, normal;
     border-bottom: 1px solid var(--hairline);
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
@@ -161,49 +164,70 @@ const { title } = Astro.props;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    gap: 0.4rem;
   }
 
+  /* Nav links: plain text at rest, a machined metal button cap materializes
+     behind the label on hover and fades back out on mouse-leave. The button
+     chrome lives entirely on ::before (opacity-only transition, cheap and
+     GPU-composited) so it can fade without affecting layout or the text. */
   .site-nav .nav-links a {
     position: relative;
+    isolation: isolate;
     display: inline-flex;
     align-items: center;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.9rem;
-    font-weight: 600;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 700;
     letter-spacing: 0.02em;
     color: var(--ink);
     text-decoration: none;
     white-space: nowrap;
-    transition: color 0.2s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-                text-shadow 0.25s ease;
+    transition: color 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  .site-nav .nav-links a::after {
+  .site-nav .nav-links a::before {
     content: '';
     position: absolute;
-    bottom: 2px;
-    left: 0.75rem;
-    right: 0.75rem;
-    height: 2px;
-    background: var(--teal);
-    transform: scaleX(0);
-    transform-origin: left;
-    /* No overshoot here (unlike the lift bounce above) - an overshooting scaleX on a
-       short link like "Overview" pushes the bar past its own edge and visibly smears
-       into the next link before settling back, reading as a rendering glitch. */
-    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-    border-radius: 1px 1px 0 0;
+    inset: 0;
+    z-index: -1;
+    border-radius: 999px;
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 45%, rgba(0, 0, 0, 0.06)),
+      var(--stainless);
+    background-size: 100% 100%, cover;
+    background-position: center, center;
+    border: 1px solid rgba(20, 24, 26, 0.2);
+    box-shadow: 0 2px 4px rgba(20, 24, 26, 0.35), 0 1px 0 rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    transition: opacity 0.25s ease;
   }
 
   .site-nav .nav-links a:hover {
-    color: var(--paper);
-    transform: translateY(-2px);
+    color: #262b2e;
+    transform: translateY(-1px);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
   }
-  .site-nav .nav-links a:hover::after { transform: scaleX(1); }
+  .site-nav .nav-links a:hover::before {
+    opacity: 1;
+  }
+  /* Click flash: a brief, bright teal glow (the same teal as "BoP" in the
+     logo) at the instant of clicking, on top of the existing press-down. */
   .site-nav .nav-links a:active {
-    color: var(--teal);
-    transform: translateY(0) scale(0.96);
-    transition: color 0.1s ease, transform 0.1s ease;
+    transform: translateY(1px);
+    filter: brightness(0.94);
+    color: var(--teal-dim);
+    text-shadow: 0 0 10px var(--teal), 0 0 2px var(--teal);
+    transition: transform 0.1s ease, filter 0.1s ease, text-shadow 0.05s ease;
+  }
+  /* Current page: teal color only, no persistent glow - the glow stays reserved for the
+     click flash above, so you can see at a glance which page you're on without every page
+     load looking lit up. */
+  .site-nav .nav-links a[aria-current="page"] {
+    color: var(--teal-dim);
+  }
+  .site-nav .nav-links a[aria-current="page"]:hover {
+    color: var(--teal-dim);
   }
 
   /* Hamburger toggle - hidden above the breakpoint, replaces nav-link wrapping below it */
@@ -253,7 +277,13 @@ const { title } = Astro.props;
       right: 0;
       height: 100vh;
       width: min(280px, 80vw);
-      background: linear-gradient(165deg, var(--steel-650), var(--steel-900));
+      background-image:
+        linear-gradient(165deg, var(--steel-650), var(--steel-900)),
+        var(--aluminum);
+      background-repeat: no-repeat, no-repeat;
+      background-size: 100% 100%, cover;
+      background-position: center, center;
+      background-blend-mode: overlay, normal;
       border-left: 1px solid var(--hairline);
       flex-direction: column;
       flex-wrap: nowrap;
@@ -267,11 +297,12 @@ const { title } = Astro.props;
       overflow-y: auto;
     }
     .site-nav .nav-links.open { transform: translateX(0); }
-    .site-nav .nav-links a { width: 100%; }
-    .site-nav .nav-links a::after { display: none; }
+    /* Touch has no hover to reveal the button chrome with, so keep it
+       always visible here rather than invisible-until-hover like desktop. */
+    .site-nav .nav-links a { width: 100%; margin-bottom: 0.35rem; color: #262b2e; }
+    .site-nav .nav-links a::before { opacity: 1; }
     .site-nav .nav-links a:hover {
-      background: rgba(0, 0, 0, 0.06);
-      border-radius: 6px;
+      filter: brightness(1.08);
       transform: none;
     }
     .nav-toggle { display: flex; }

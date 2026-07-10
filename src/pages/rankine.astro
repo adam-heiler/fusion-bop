@@ -8,14 +8,24 @@ import RankineCycle from '../components/RankineCycle.svelte';
       250 bar supercritical reheat regenerative cycle: 6 closed feedwater heaters,
       deaerator, 7 extraction bleeds, cooling-tower condenser. Heat duty Q = 1000 MW fixed.
     </p>
-    <div class="drafting-mat">
+    <div class="drafting-mat chamfer-panel chamfer-all">
       <div class="drafting-panel">
-        <span class="drafting-tape" style="top: -12px; left: 40px; transform: rotate(-3deg);"></span>
-        <span class="drafting-tape" style="top: -12px; right: 40px; transform: rotate(2deg);"></span>
+        <span class="drafting-frame"></span>
+        <span class="drafting-corner tl"></span>
+        <span class="drafting-corner tr"></span>
+        <span class="drafting-corner bl"></span>
+        <span class="drafting-corner br"></span>
         <img src="/diagrams/fusion-rankine.png" alt="Process flow diagram of the supercritical reheat regenerative Rankine cycle balance of plant" />
         <div class="drafting-titleblock">
-          <span>FUSION BOP &middot; H<sub>2</sub>O RANKINE CYCLE &middot; PROCESS FLOW DIAGRAM</span>
-          <span>DWG RANKINE&#8209;01&nbsp;&nbsp;REV A</span>
+          <div class="tb-title">
+            <span class="tb-line1">FUSION BOP</span>
+            <span class="tb-line2">H<sub>2</sub>O RANKINE CYCLE PROCESS FLOW DIAGRAM</span>
+          </div>
+          <div class="tb-meta">
+            <div class="tb-row"><span class="tb-key">DWG NO.</span><span class="tb-val">RANKINE&#8209;01</span></div>
+            <div class="tb-row"><span class="tb-key">REV</span><span class="tb-val">A</span></div>
+            <div class="tb-row"><span class="tb-key">SCALE</span><span class="tb-val">NTS</span></div>
+          </div>
         </div>
       </div>
     </div>

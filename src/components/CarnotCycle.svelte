@@ -132,7 +132,7 @@
 
   <div class="diagram-col">
     <p class="panel-title">Temperature&ndash;Entropy Diagram</p>
-    <div class="diagram-panel chamfer-panel">
+    <div class="diagram-panel chamfer-panel chamfer-all">
     <svg
       viewBox="0 0 320 250"
       class="ts-svg"

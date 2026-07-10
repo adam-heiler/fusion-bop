@@ -1,39 +1,50 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { init, solveCycle, getDome, minPC as solverMinPC, minPG as solverMinPG } from '../lib/rankineSolver.js';
+  import { initSolver, solveCycleAsync, minPCAsync, minPGAsync, maxPEAsync } from '../lib/solverWorkerClient.js';
   import Gauge from './Gauge.svelte';
 
   // -- Slider state -----------------------------------------------------------
-  let P1            = $state(250);
-  let T1            = $state(540);
-  let T3            = $state(500);
-  let P2            = $state(60);
-  let P4            = $state(5);
-  let reheat_dP_pct = $state(3);
-  let P_VA          = $state(117);
-  let P_B           = $state(100);
-  let P_C           = $state(7.5);
-  let P_D           = $state(6);
-  let P_E           = $state(4.3);
-  let P_F           = $state(2.2);
-  let P_G           = $state(1.5);
-  let Q             = $state(1000);
-  let eta_HP   = $state(0.85);
-  let eta_IP   = $state(0.85);
-  let eta_LP   = $state(0.85);
-  let eta_pump = $state(0.85);
-  let eta_gen  = $state(0.985);
-  let TTD         = $state(2.8);
-  let T0          = $state(25);
-  let RH          = $state(50);
-  let cw_approach = $state(3.1);
-  // Level-3 circulating-water inputs (replace the old fixed cond_TTD slider):
-  //   r_cw = circulating-water : steam mass-flow ratio (sets ṁ_cw = r_cw · ṁ_steam)
-  //   UA   = condenser conductance (MW/K), the held physical size of the condenser.
-  // The condenser terminal difference (TTD) and CW temperature rise (range) are now
-  // EMERGENT outputs of the ε-NTU model, not inputs.
-  let r_cw        = $state(23);
-  let UA          = $state(80.9);
+  // Single source of truth for every slider's starting value, so the Reset button (below)
+  // can restore the exact same cycle rather than drifting from these initializers over time.
+  const DEFAULTS = {
+    P1: 250, T1: 540, T3: 500, P2: 60, P4: 5, reheat_dP_pct: 3,
+    P_VA: 117, P_B: 100, P_C: 7.5, P_D: 6, P_E: 4.3, P_F: 2.2, P_G: 1.5,
+    Q: 1000,
+    eta_HP: 0.85, eta_IP: 0.85, eta_LP: 0.85, eta_pump: 0.85, eta_gen: 0.985,
+    TTD: 2.8, T0: 25, RH: 50, cw_approach: 3.1,
+    // Level-3 circulating-water inputs (replace the old fixed cond_TTD slider):
+    //   r_cw = circulating-water : steam mass-flow ratio (sets ṁ_cw = r_cw · ṁ_steam)
+    //   UA   = condenser conductance (MW/K), the held physical size of the condenser.
+    // The condenser terminal difference (TTD) and CW temperature rise (range) are now
+    // EMERGENT outputs of the ε-NTU model, not inputs.
+    r_cw: 23, UA: 80.9,
+  };
+
+  let P1            = $state(DEFAULTS.P1);
+  let T1            = $state(DEFAULTS.T1);
+  let T3            = $state(DEFAULTS.T3);
+  let P2            = $state(DEFAULTS.P2);
+  let P4            = $state(DEFAULTS.P4);
+  let reheat_dP_pct = $state(DEFAULTS.reheat_dP_pct);
+  let P_VA          = $state(DEFAULTS.P_VA);
+  let P_B           = $state(DEFAULTS.P_B);
+  let P_C           = $state(DEFAULTS.P_C);
+  let P_D           = $state(DEFAULTS.P_D);
+  let P_E           = $state(DEFAULTS.P_E);
+  let P_F           = $state(DEFAULTS.P_F);
+  let P_G           = $state(DEFAULTS.P_G);
+  let Q             = $state(DEFAULTS.Q);
+  let eta_HP   = $state(DEFAULTS.eta_HP);
+  let eta_IP   = $state(DEFAULTS.eta_IP);
+  let eta_LP   = $state(DEFAULTS.eta_LP);
+  let eta_pump = $state(DEFAULTS.eta_pump);
+  let eta_gen  = $state(DEFAULTS.eta_gen);
+  let TTD         = $state(DEFAULTS.TTD);
+  let T0          = $state(DEFAULTS.T0);
+  let RH          = $state(DEFAULTS.RH);
+  let cw_approach = $state(DEFAULTS.cw_approach);
+  let r_cw        = $state(DEFAULTS.r_cw);
+  let UA          = $state(DEFAULTS.UA);
 
   const FIXED = {
     P_condpump: 5, P_feedpump: 250, subcool: 2.8,
@@ -76,8 +87,8 @@
   // what the deaerator + feedwater pump already delivers. Solved numerically inside
   // rankineSolver.js (a few cheap CoolProp calls) rather than in closed form, since the
   // feedwater pump's enthalpy rise doesn't invert analytically.
-  function minPC(): number {
-    return solverMinPC(P_D, TTD, eta_pump);
+  async function minPC(): Promise<number> {
+    return minPCAsync(P_D, TTD, eta_pump);
   }
 
   // Minimum P_G such that FWH1's TTD-determined feedwater outlet stays above what the
@@ -85,75 +96,130 @@
   // condenser saturation temperature is emergent, so we feed the clamp the most recent
   // solved T6C (result.T6C - one drag-step stale, an excellent estimate since sliders move
   // incrementally). On first load, before any solve, fall back to a nominal estimate.
-  function minPG(): number {
+  async function minPG(): Promise<number> {
     const T6C_est = result ? result.T6C : (25 + cw_approach + 13);
-    return solverMinPG(T6C_est, TTD, eta_pump);
+    return minPGAsync(T6C_est, TTD, eta_pump);
   }
 
-  function enforceOrder(changed: string) {
+  // Maximum P_E such that FWH3's TTD-determined feedwater outlet stays below the
+  // condensate pump's saturation temperature - see maxPE() in rankineSolver.js for why
+  // this boundary exists (P_G/P_F can't hit it, their own sliders top out at/below Pcond;
+  // P_E's does not) and what happens when it's crossed (outlet snaps onto the vapor branch).
+  async function maxPE(): Promise<number> {
+    return maxPEAsync(TTD, FIXED.P_condpump);
+  }
+
+  type Chain = [string, () => number, (v: number) => void, number, number][];
+  function getChain(): Chain {
+    return [
+      ['P1',   () => P1,   v => P1 = v,   30, 300],
+      ['P_VA', () => P_VA, v => P_VA = v, 60, 200],
+      ['P_B',  () => P_B,  v => P_B = v,  50, 150],
+      ['P2',   () => P2,   v => P2 = v,   30, 100],
+      ['P_C',  () => P_C,  v => P_C = v,  4,  15],
+      ['P_D',  () => P_D,  v => P_D = v,  3,  12],
+      ['P4',   () => P4,   v => P4 = v,   2,  20],
+      ['P_E',  () => P_E,  v => P_E = v,  2,  8],
+      ['P_F',  () => P_F,  v => P_F = v,  1,  5],
+      ['P_G',  () => P_G,  v => P_G = v,  0.5, 3],
+    ];
+  }
+  const snap = (v: number) => +v.toFixed(3);
+
+  // Special TTD-aware boundaries, on top of plain pressure ordering: FWH4 against the
+  // deaerator (P_C), FWH1 against the condenser (P_G), and FWH3 against the condensate pump
+  // (P_E, upper-bounded instead of lower). These all depend on TTD, not just on neighboring
+  // sliders, so they're pulled out here and re-checked both after any chain-pressure edit
+  // AND after a direct TTD edit (a TTD change alone can push a pressure that hasn't moved
+  // out of bounds).
+  // Returns one human-readable reason per boundary that had to clamp, or [] if none did -
+  // callers join these onto the warning toast so the user learns WHY, not just THAT,
+  // something moved. The P_E case in particular gets specific "flashing" language: unlike
+  // the P_C/P_G cases (which prevent an unphysical negative extraction flow), crossing this
+  // one means the feedwater would genuinely start vaporizing inside the FWH3 tubes.
+  async function enforceTTDBoundaries(): Promise<string[]> {
+    const chain = getChain();
+    const reasons: string[] = [];
+
+    const pcMin = await minPC();
+    if (pcMin > 0 && P_C < pcMin) {
+      P_C = snap(pcMin);
+      reasons.push(`P_C (FWH4) raised to ${P_C} bar - any lower and the deaerator would already be hotter than FWH4 could deliver, forcing its extraction flow negative.`);
+      for (let i = chain.findIndex(([n]) => n === 'P_C') - 1; i >= 0; i--) {
+        const [, get, set, lo, hi] = chain[i];
+        const [, getBelow] = chain[i + 1];
+        if (get() <= getBelow() + GAP) set(snap(Math.min(hi, Math.max(lo, getBelow() + GAP))));
+      }
+    }
+    const pgMin = await minPG();
+    if (pgMin > 0 && P_G < pgMin) {
+      P_G = snap(pgMin);
+      reasons.push(`P_G (FWH1) raised to ${P_G} bar - any lower and the condenser would already be hotter than FWH1 could deliver, forcing its extraction flow negative.`);
+      for (let i = chain.findIndex(([n]) => n === 'P_G') - 1; i >= chain.findIndex(([n]) => n === 'P4'); i--) {
+        const [, get, set, lo, hi] = chain[i];
+        const [, getBelow] = chain[i + 1];
+        if (get() <= getBelow() + GAP) set(snap(Math.min(hi, Math.max(lo, getBelow() + GAP))));
+      }
+    }
+    const peMax = await maxPE();
+    if (peMax > 0 && P_E > peMax) {
+      const [, , , peLo] = chain[chain.findIndex(([n]) => n === 'P_E')];
+      P_E = snap(Math.max(peLo, peMax - GAP));
+      reasons.push(`P_E (FWH3) lowered to ${P_E} bar - above this, the shell steam is hotter than the condensate line pressure can keep liquid, so the feedwater would flash to vapor inside the FWH3 tubes.`);
+      for (let i = chain.findIndex(([n]) => n === 'P_E') + 1; i < chain.length; i++) {
+        const [, get, set, lo, hi] = chain[i];
+        const [, getAbove] = chain[i - 1];
+        if (get() >= getAbove() - GAP) set(snap(Math.min(hi, Math.max(lo, getAbove() - GAP))));
+      }
+    }
+
+    return reasons;
+  }
+
+  async function enforceOrder(changed: string) {
     // Walk the chain in both directions from the slider that just moved, pushing
     // neighbors out of the way only enough to restore a valid strict ordering.
-    const chain: [string, () => number, (v: number) => void][] = [
-      ['P1',   () => P1,   v => P1 = v],
-      ['P_VA', () => P_VA, v => P_VA = v],
-      ['P_B',  () => P_B,  v => P_B = v],
-      ['P2',   () => P2,   v => P2 = v],
-      ['P_C',  () => P_C,  v => P_C = v],
-      ['P_D',  () => P_D,  v => P_D = v],
-      ['P4',   () => P4,   v => P4 = v],
-      ['P_E',  () => P_E,  v => P_E = v],
-      ['P_F',  () => P_F,  v => P_F = v],
-      ['P_G',  () => P_G,  v => P_G = v],
-    ];
+    // Each entry also carries that slider's own displayed [min,max] - without
+    // it, a large enough push (e.g. P1 dropped near its own floor) could
+    // compute a "required" value for a neighbor (P_VA) that falls outside
+    // what THAT slider can actually show. The <input> silently clamps its
+    // displayed value to its own min/max, but the JS state variable doesn't -
+    // it kept the un-clampable number, which then fed a negative/broken
+    // --pct (fill visibly detached from the thumb) AND, worse, fed that same
+    // unrealistic value into the physics solve. Clamping to bounds here
+    // means state can never diverge from what's on screen.
+    const chain = getChain();
     const idx = chain.findIndex(([name]) => name === changed);
     if (idx === -1) return;
 
     let clamped = false;
 
-    const snap = (v: number) => +v.toFixed(3);
-
     for (let i = idx - 1; i >= 0; i--) {
-      const [, get, set] = chain[i];
+      const [, get, set, lo, hi] = chain[i];
       const [, getBelow] = chain[i + 1];
       if (get() <= getBelow() + GAP) {
-        set(snap(getBelow() + GAP));
+        set(snap(Math.min(hi, Math.max(lo, getBelow() + GAP))));
         clamped = true;
       }
     }
     for (let i = idx + 1; i < chain.length; i++) {
-      const [, get, set] = chain[i];
+      const [, get, set, lo, hi] = chain[i];
       const [, getAbove] = chain[i - 1];
       if (get() >= getAbove() - GAP) {
-        set(snap(Math.max(0.01, getAbove() - GAP)));
+        set(snap(Math.min(hi, Math.max(lo, getAbove() - GAP))));
         clamped = true;
       }
     }
 
     // Special TTD-aware boundaries: re-check AFTER the plain ordering pass above, since
     // these need a bigger margin than the simple ordering clamp provides.
-    const pcMin = minPC();
-    if (pcMin > 0 && P_C < pcMin) {
-      P_C = snap(pcMin);
-      clamped = true;
-      for (let i = chain.findIndex(([n]) => n === 'P_C') - 1; i >= 0; i--) {
-        const [, get, set] = chain[i];
-        const [, getBelow] = chain[i + 1];
-        if (get() <= getBelow() + GAP) set(snap(getBelow() + GAP));
-      }
-    }
-    const pgMin = minPG();
-    if (pgMin > 0 && P_G < pgMin) {
-      P_G = snap(pgMin);
-      clamped = true;
-      for (let i = chain.findIndex(([n]) => n === 'P_G') - 1; i >= chain.findIndex(([n]) => n === 'P4'); i--) {
-        const [, get, set] = chain[i];
-        const [, getBelow] = chain[i + 1];
-        if (get() <= getBelow() + GAP) set(snap(getBelow() + GAP));
-      }
-    }
+    const ttdReasons = await enforceTTDBoundaries();
 
-    if (clamped) {
-      flagOrder(`Adjacent pressure(s) shifted to keep ${changed} thermodynamically valid (each stage must heat the feedwater above what the previous stage already delivered).`);
+    if (clamped || ttdReasons.length) {
+      const msgs = clamped
+        ? [`Adjacent pressure(s) shifted to keep ${changed} thermodynamically valid (each stage must heat the feedwater above what the previous stage already delivered).`]
+        : [];
+      flagOrder(msgs.concat(ttdReasons).join(' '));
     }
   }
 
@@ -187,29 +253,54 @@
   let result  = $state<any>(null);
   let errMsg  = $state<string | null>(null);
 
-  function runSolve() {
-    // Deferred as a macrotask (not requestAnimationFrame, which runs *before* the
-    // browser's next paint) so the released slider thumb actually gets painted before
-    // the CoolProp solve blocks the main thread - otherwise the thumb stays visually
-    // "stuck" enlarged for the whole calculation, since no repaint can happen mid-block.
-    setTimeout(() => {
-      try {
-        result = solveCycle(params());
-        errMsg = null;
-      } catch (e: any) {
-        errMsg = String(e);
-      }
-    });
+  async function runSolve() {
+    // The solve itself now runs on a Worker (see solverWorkerClient.js), so
+    // this await never blocks the main thread - no more macrotask-deferral
+    // trick needed to keep the page painting while it runs.
+    try {
+      result = await solveCycleAsync(params());
+      errMsg = null;
+    } catch (e: any) {
+      errMsg = String(e);
+    }
   }
 
-  function onPressureChange(name: string) {
-    enforceOrder(name);
+  async function onPressureChange(name: string) {
+    await enforceOrder(name);
+    runSolve();
+  }
+
+  // TTD moves the FWH3/vapor-branch boundary (and the FWH4/FWH1 ones) even when no
+  // pressure slider moves, so it needs its own boundary re-check rather than going
+  // straight to runSolve() the way a plain non-ordering slider would.
+  async function onTTDChange() {
+    const reasons = await enforceTTDBoundaries();
+    if (reasons.length) flagOrder(reasons.join(' '));
+    runSolve();
+  }
+
+  // Every slider is independently adjustable and several combinations are easy to walk into
+  // that are thermodynamically ugly (very low turbine efficiencies, TTD/pressure combos near
+  // the flashing boundary, etc.) - a one-click way back to a known-good cycle beats hunting
+  // down and re-dragging every slider that got touched.
+  function resetAll() {
+    P1 = DEFAULTS.P1; T1 = DEFAULTS.T1; T3 = DEFAULTS.T3; P2 = DEFAULTS.P2; P4 = DEFAULTS.P4;
+    reheat_dP_pct = DEFAULTS.reheat_dP_pct;
+    P_VA = DEFAULTS.P_VA; P_B = DEFAULTS.P_B; P_C = DEFAULTS.P_C; P_D = DEFAULTS.P_D;
+    P_E = DEFAULTS.P_E; P_F = DEFAULTS.P_F; P_G = DEFAULTS.P_G;
+    Q = DEFAULTS.Q;
+    eta_HP = DEFAULTS.eta_HP; eta_IP = DEFAULTS.eta_IP; eta_LP = DEFAULTS.eta_LP;
+    eta_pump = DEFAULTS.eta_pump; eta_gen = DEFAULTS.eta_gen;
+    TTD = DEFAULTS.TTD; T0 = DEFAULTS.T0; RH = DEFAULTS.RH;
+    cw_approach = DEFAULTS.cw_approach; r_cw = DEFAULTS.r_cw; UA = DEFAULTS.UA;
+    orderWarning = '';
+    if (warnTimeout) clearTimeout(warnTimeout);
+    errMsg = null;
     runSolve();
   }
 
   onMount(async () => {
-    await init();
-    dome = getDome();
+    dome = await initSolver();
     loading = false;
     runSolve();
   });
@@ -256,10 +347,26 @@
   // than via direct user dragging, which is when the global --pct-sync script (attached
   // only to native 'input' events) would otherwise miss the update.
   function pct(v: number, min: number, max: number) {
-    return ((v - min) / (max - min)) * 100;
+    // Clamped defensively: enforceOrder now keeps state within each
+    // slider's own bounds, but this guards against ever rendering a
+    // gradient stop outside [0,100] (a negative or >100% --pct visibly
+    // detaches the fill from the thumb, which is invalid CSS - browsers
+    // just clamp the color-stop, so the "filled" portion silently stops
+    // matching where the thumb actually sits).
+    return Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100));
   }
 
 </script>
+
+<!-- ── Page title ─────────────────────────────────────────────────────────── -->
+<div class="page-header">
+  <h1 class="page-title">
+    <span class="title-super" class:struck={!isSupercritical}>Supercritical</span> H<sub>2</sub>O Rankine Cycle
+  </h1>
+  <button type="button" class="reset-btn chamfer-panel chamfer-sm" onclick={resetAll} title="Restore every slider to its default value">
+    <span>Reset cycle</span>
+  </button>
+</div>
 
 <div class="rankine-wrap">
   {#if loading}
@@ -268,18 +375,13 @@
       <p>Initializing CoolProp WASM…</p>
     </div>
   {:else if errMsg}
-    <div class="error-banner chamfer-panel chamfer-sm">Solver error: {errMsg}</div>
+    <div class="error-banner chamfer-panel chamfer-sm"><span>Solver error: {errMsg}</span></div>
   {:else}
-    <!-- ── Page title ────────────────────────────────────────────────────────── -->
-    <h1 class="page-title" style="grid-column: 1 / -1;">
-      <span class="title-super" class:struck={!isSupercritical}>Supercritical</span> H<sub>2</sub>O Rankine Cycle
-    </h1>
-
     <!-- ── Left column ─────────────────────────────────────────────────────── -->
     <div class="controls-col">
 
       {#if orderWarning}
-        <div class="order-warning chamfer-panel chamfer-sm">{orderWarning}</div>
+        <div class="order-warning chamfer-panel chamfer-sm"><span>{orderWarning}</span></div>
       {/if}
 
       <!-- Steam conditions (open by default, steam-generator-orange sliders) -->
@@ -351,7 +453,7 @@
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>FWH terminal temp diff (TTD)</span><span class="slider-value">{TTD} °C</span></div>
-            <input id="r-ttd" type="range" min="0" max="15" step="0.5" bind:value={TTD} onchange={runSolve} />
+            <input id="r-ttd" type="range" min="0" max="15" step="0.5" bind:value={TTD} onchange={onTTDChange} />
           </div>
         </div>
       </details>
@@ -453,7 +555,7 @@
     <div class="diagram-col">
       <p class="diagram-title">Temperature-Entropy (T-s) Diagram</p>
 
-      <div class="scope-panel chamfer-panel">
+      <div class="scope-panel chamfer-panel chamfer-all">
       <svg viewBox="0 0 {SVG_W} {SVG_H}" class="ts-svg" role="img"
            aria-label="T-s diagram of the supercritical reheat regenerative Rankine cycle">
 
@@ -681,9 +783,14 @@
     border-radius: 50%; animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* Both use the smooth stainless-steel photo instead of the brushed
+     aluminum grain: these are small, text-carrying chips, and the brushed
+     photo's grain/contrast was competing with the message instead of
+     sitting quietly behind it. */
   .error-banner {
     grid-column: 1 / -1; padding: 12px 16px; color: var(--red-dim); font-size: 14px;
   }
+  .error-banner::before { background-image: linear-gradient(165deg, var(--steel-650), var(--steel-800) 72%), var(--stainless); }
   /* Fixed as a toast (not inline in controls-col) so it's visible regardless of
      where the page is scrolled when an auto-clamp fires. */
   .order-warning {
@@ -691,12 +798,15 @@
     left: 50%;
     bottom: 24px;
     transform: translateX(-50%);
-    max-width: min(90vw, 480px);
-    padding: 12px 16px; color: var(--amber-dim); font-size: 12.5px;
+    max-width: min(90vw, 560px);
+    max-height: min(50vh, 260px);
+    overflow-y: auto;
+    padding: 14px 18px; color: var(--amber-dim); font-size: 15px; font-weight: 700;
     line-height: 1.4;
     z-index: 100;
     animation: order-warning-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   }
+  .order-warning::before { background-image: linear-gradient(165deg, var(--steel-650), var(--steel-800) 72%), var(--stainless); }
   @keyframes order-warning-in {
     from { opacity: 0; transform: translateX(-50%) translateY(14px); }
     to   { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -874,12 +984,45 @@
   .leg-drain::before  { background: var(--amber-dim); }
   .leg-dome::before   { background: var(--teal-dim); }
 
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
   /* Page title with reactive supercritical strikethrough */
   .page-title {
     font-family: var(--font-display);
     font-size: 24px; font-weight: 700; color: var(--paper);
     letter-spacing: 0.02em;
     margin: 0 0 16px; line-height: 1.3;
+  }
+
+  /* One-click way back to a known-good cycle after e.g. dragging efficiencies to
+     unrealistic extremes - same chamfered-metal chrome as every other panel, but sized
+     and colored (teal on hover, matching the nav's current-page/click glow) like a button. */
+  .reset-btn {
+    margin-bottom: 16px;
+    padding: 8px 16px;
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--ink);
+    cursor: pointer;
+    border: none;
+    transition: color 0.15s ease, transform 0.15s ease, filter 0.15s ease;
+  }
+  .reset-btn:hover {
+    color: var(--teal-dim);
+    filter: brightness(1.08);
+  }
+  .reset-btn:active {
+    transform: translateY(1px);
+    filter: brightness(0.94);
+    text-shadow: 0 0 8px var(--teal);
   }
   .title-super {
     transition: text-decoration 0.2s, opacity 0.2s, color 0.2s;
