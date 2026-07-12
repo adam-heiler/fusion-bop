@@ -57,7 +57,7 @@
     const p1 = pt(a, major ? R + 10 : R + 4);
     return { x1: p0.x, y1: p0.y, x2: p1.x, y2: p1.y, major };
   }
-  function tickLabelPos(f: number) { return pt(angleFor(f), R + 21); }
+  function tickLabelPos(f: number) { return pt(angleFor(f), R + 23); }
 
   const needlePoly = $derived.by(() => {
     const a = angleFor(clampedValue) * Math.PI / 180;
@@ -72,9 +72,10 @@
   });
 </script>
 
-<div class="gauge-widget chamfer-panel chamfer-sm" class:gauge-alarm={warn}>
+<div class="gauge-outer" class:gauge-alarm={warn}>
+<div class="gauge-widget chamfer-panel chamfer-sm">
   <p class="gauge-label">{label}</p>
-  <svg viewBox="0 0 160 112" class="gauge-svg">
+  <svg viewBox="-12 0 184 112" class="gauge-svg">
     <defs>
       <linearGradient id="bezel-{uid}" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="#fbfbfa" />
@@ -116,22 +117,22 @@
       <path d={dangerPath} fill="none" stroke="var(--red, #ff6459)" stroke-width="3.5" stroke-linecap="round" opacity="0.8" />
     {/if}
 
-    <!-- Tick ring -->
-    {#each TICKS as f (f)}
-      {@const t = tickLine(f)}
-      <line x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke={t.major ? '#3a3f44' : '#8b9490'} stroke-width={t.major ? 1.3 : 0.7} />
-      {#if t.major}
-        {@const lp = tickLabelPos(f)}
-        <text x={lp.x} y={lp.y + 3} class="gauge-num" text-anchor="middle">{Math.round(f * 100)}</text>
-      {/if}
-    {/each}
-
     <!-- Sweep track + fill -->
     <path d={trackPath} fill="none" stroke="#b7bcb8" stroke-width="7" stroke-linecap="round" />
     <!-- Plain stroke, no drop-shadow filter: fillPath's shape changes on every
          solve, and re-rasterizing a blur filter each time (x4 gauges) was a
          real contributor to update lag - not worth the subtle glow. -->
     <path d={fillPath} fill="none" stroke={accent} stroke-width="7" stroke-linecap="round" />
+
+    <!-- Tick ring (drawn on top of the track, or the track paints over it) -->
+    {#each TICKS as f (f)}
+      {@const t = tickLine(f)}
+      <line x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke={t.major ? '#20242a' : '#5b6268'} stroke-width={t.major ? 1.8 : 1.1} />
+      {#if t.major}
+        {@const lp = tickLabelPos(f)}
+        <text x={lp.x} y={lp.y + 3} class="gauge-num" text-anchor="middle">{Math.round(f * 100)}</text>
+      {/if}
+    {/each}
 
     <!-- Glass glare -->
     <path d={bezelPath} fill="url(#glass-{uid})" clip-path="url(#clip-{uid})" />
@@ -147,6 +148,7 @@
     <span class="lcd-value">{valueText}</span>{#if unit}<span class="lcd-unit">{unit}</span>{/if}
   </div>
 </div>
+</div>
 
 <style>
   .gauge-widget {
@@ -154,7 +156,7 @@
   }
   .gauge-label {
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.06em;
     line-height: 1.25;
     text-transform: uppercase;
@@ -162,7 +164,7 @@
     margin: 0 0 4px;
   }
   .gauge-svg { width: 100%; height: auto; display: block; }
-  .gauge-num { font-family: var(--font-mono, monospace); font-size: 8px; fill: #52585e; }
+  .gauge-num { font-family: var(--font-mono, monospace); font-size: 9.5px; font-weight: 700; fill: #20242a; }
 
   .lcd {
     width: 100%;
@@ -185,12 +187,15 @@
     75%      { transform: rotate(1.5deg); }
   }
 
+  /* .gauge-widget has clip-path (for its chamfered corners), which clips box-shadow too -
+     an alarm glow on that element would just get cut off at the corners. Applying it to
+     this unclipped outer wrapper instead lets it actually bleed past the panel edges. */
+  .gauge-outer { border-radius: 8px; }
   .gauge-alarm {
-    animation: gauge-alarm-ring 1.3s ease-out infinite;
+    animation: gauge-alarm-glow 1s ease-in-out infinite;
   }
-  @keyframes gauge-alarm-ring {
-    0%   { box-shadow: 0 7px 18px rgba(0, 0, 0, 0.5), 0 0 0 0 rgba(255, 100, 89, 0.55); }
-    70%  { box-shadow: 0 7px 18px rgba(0, 0, 0, 0.5), 0 0 0 7px rgba(255, 100, 89, 0); }
-    100% { box-shadow: 0 7px 18px rgba(0, 0, 0, 0.5), 0 0 0 0 rgba(255, 100, 89, 0); }
+  @keyframes gauge-alarm-glow {
+    0%, 100% { box-shadow: 0 7px 18px rgba(0, 0, 0, 0.5), 0 0 10px 2px rgba(255, 61, 46, 0.6), 0 0 0 0 rgba(255, 61, 46, 0.5); }
+    50%      { box-shadow: 0 7px 18px rgba(0, 0, 0, 0.5), 0 0 26px 8px rgba(255, 61, 46, 1), 0 0 0 6px rgba(255, 61, 46, 0.18); }
   }
 </style>

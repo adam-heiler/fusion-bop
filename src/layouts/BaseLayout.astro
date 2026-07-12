@@ -12,6 +12,8 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
@@ -19,7 +21,7 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
   </head>
   <body class="min-h-screen">
     <nav class="site-nav">
-      <a href="/" class="site-logo">Fusion<span class="logo-bop">BoP</span></a>
+      <a href="/" class="site-logo"><span class="logo-text">Fusion<span class="logo-bop">BoP</span></span><img src="/logo.png" alt="" class="site-logo-mark" /></a>
       <span class="beta-badge">Beta</span>
 
       <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="nav-links">
@@ -112,6 +114,9 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
   }
 
   .site-nav .site-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
     font-family: var(--font-display);
     font-size: 1.25rem;
     font-weight: 700;
@@ -128,7 +133,17 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
   .site-nav .site-logo:active { opacity: 0.45; transform: translateY(1px); }
 
   .site-nav .logo-bop { color: var(--teal-dim); }
+  .site-nav .site-logo-mark { height: 1.05em; width: auto; display: block; }
 
+  /* Recessed (pressed-in), not raised: dark inset shadow cast from the top lip, subtle
+     light catch at the bottom edge - the opposite lighting convention from a raised chip
+     like the reset button (compare its outer drop-shadow + top highlight). No outer
+     box-shadow either, since a recess doesn't cast a shadow onto the surrounding panel.
+     No texture image of its own, either: the badge sits directly on the nav's own
+     aluminum background, so a separately-sized copy of the same image (via background-size:
+     cover on this tiny box) rendered its grain at a totally different scale than the nav
+     behind it. Just tinting with a transparent gradient lets the nav's own texture show
+     through underneath at the correct, already-matching scale. */
   .beta-badge {
     display: inline-flex;
     align-items: center;
@@ -137,14 +152,15 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--amber);
-    background: linear-gradient(180deg, #17140c, #0e0c08);
-    border: 1px solid #000;
+    color: var(--ink);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+    background-image: linear-gradient(180deg, rgba(0, 0, 0, 0.16), transparent 45%, rgba(255, 255, 255, 0.16));
+    border: 1px solid rgba(20, 24, 26, 0.2);
     border-radius: 999px;
     padding: 0.2rem 0.6rem;
     margin-right: 1.25rem;
     white-space: nowrap;
-    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.8);
+    box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.45), inset 0 -1px 0 rgba(255, 255, 255, 0.4);
   }
 
   .site-nav .nav-links {

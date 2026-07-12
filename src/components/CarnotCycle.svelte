@@ -204,7 +204,7 @@
 
   .slider-label label {
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.02em;
     color: var(--ink);
   }
@@ -212,7 +212,7 @@
   .slider-value {
     font-family: var(--font-mono);
     font-size: 13px;
-    font-weight: 400;
+    font-weight: 700;
   }
 
   .th-slider { --slider-color: #e8935f; }
@@ -238,7 +238,7 @@
 
   .readout-label {
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.05em;
     color: var(--ink-dim);
     margin: 0 0 5px;
@@ -247,7 +247,7 @@
 
   .readout-value {
     font-size: 18px;
-    font-weight: 400;
+    font-weight: 700;
     color: var(--paper);
     margin: 0;
     font-variant-numeric: tabular-nums;
@@ -257,11 +257,12 @@
     font-family: var(--font-display);
     font-size: 11px;
     color: var(--ink-dim);
-    font-weight: 500;
+    font-weight: 700;
   }
 
   .exergy-note {
     font-size: 11px;
+    font-weight: 700;
     color: var(--ink-dim);
     margin: 6px 0 0;
   }
@@ -285,6 +286,7 @@
   .axis-text {
     font-family: var(--font-mono);
     font-size: 12px;
+    font-weight: 700;
     fill: var(--ink-dim);
   }
 
@@ -297,7 +299,7 @@
   .ref-text {
     font-family: var(--font-mono);
     font-size: 13px;
-    font-weight: 400;
+    font-weight: 700;
     fill: var(--ink);
   }
 
@@ -335,7 +337,7 @@
   .point-text {
     font-family: var(--font-mono);
     font-size: 12px;
-    font-weight: 400;
+    font-weight: 700;
     fill: var(--paper);
   }
 
@@ -347,6 +349,7 @@
 
   .caption {
     font-size: 13px;
+    font-weight: 700;
     color: var(--ink-dim);
     margin: 0;
     line-height: 1.5;

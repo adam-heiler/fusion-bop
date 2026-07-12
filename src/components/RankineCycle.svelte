@@ -259,6 +259,10 @@
 
   const g4Raw    = $derived(result ? result.W_pumps / result.W_turb : 0);
 
+  // High condenser back-pressure (loss of vacuum) - 15 kPa is well above the ~5-10 kPa
+  // design range and roughly matches typical plant "high back pressure" alarm setpoints.
+  const condWarn = $derived(!!result && result.P6 / 1000 > 15);
+
   // T-s diagram geometry
   const SVG_W = 500, SVG_H = 370;
   const PL = 46, PR = 10, PT = 12, PB = 36;
@@ -459,7 +463,7 @@
                     {#each keys as key}
                       <label class="sel-item">
                         <input type="checkbox" bind:checked={showExtraction[key]} />
-                        <span class="sel-dot" class:sel-dot-drain={!key.endsWith('1')}></span>
+                        <span class="sel-dot" class:sel-dot-drain={!key.endsWith('1')} class:sel-dot-off={!showExtraction[key]}></span>
                         <span class="sel-label">{result.extractionStatePoints[key]?.[2] ?? key}</span>
                       </label>
                     {/each}
@@ -601,9 +605,11 @@
             <p class="readout-label">Total steam flow</p>
             <p class="readout-value">{fmt(result.m, 1)} <span class="readout-unit">kg/s</span></p>
           </div>
-          <div class="readout-card chamfer-panel chamfer-sm">
-            <p class="readout-label">Condenser pressure</p>
-            <p class="readout-value">{fmt(result.P6 / 1000, 2)} <span class="readout-unit">kPa</span></p>
+          <div class="readout-outer" class:readout-alarm={condWarn}>
+            <div class="readout-card chamfer-panel chamfer-sm">
+              <p class="readout-label">Condenser pressure</p>
+              <p class="readout-value" class:readout-value-alarm={condWarn}>{fmt(result.P6 / 1000, 2)} <span class="readout-unit">kPa</span></p>
+            </div>
           </div>
           <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Condenser temp</p>
@@ -757,7 +763,7 @@
   /* Emergent condenser metrics helper line under the cooling sliders */
   .cond-helper {
     font-family: var(--font-mono);
-    font-size: 11px; color: var(--blue); line-height: 1.4; margin: 8px 0 0;
+    font-size: 11px; font-weight: 700; color: var(--blue); line-height: 1.4; margin: 8px 0 0;
     padding: 7px 9px; background: rgba(111, 178, 238, 0.07); border: 1px solid rgba(111, 178, 238, 0.25); border-radius: 3px;
   }
 
@@ -770,9 +776,9 @@
   .slider-label {
     display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px;
   }
-  .slider-label span:first-child { font-size: 13px; color: var(--ink); }
+  .slider-label span:first-child { font-size: 13px; font-weight: 700; color: var(--ink); }
   .slider-value {
-    font-size: 13px; font-weight: 400; color: var(--paper);
+    font-size: 13px; font-weight: 700; color: var(--paper);
     font-variant-numeric: tabular-nums; min-width: 56px; text-align: right;
   }
 
@@ -788,15 +794,25 @@
     padding: 8px 10px;
   }
   .readout-label {
-    font-size: 10px; font-weight: 600; letter-spacing: 0.04em; line-height: 1.25;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em; line-height: 1.25;
     color: var(--ink-dim); text-transform: uppercase; margin: 0 0 4px;
   }
   .readout-value {
-    font-size: 16px; font-weight: 400; color: var(--paper);
+    font-size: 16px; font-weight: 700; color: var(--paper);
     margin: 0; font-variant-numeric: tabular-nums; white-space: nowrap;
   }
   .readout-value-amber { color: var(--amber-dim); }
-  .readout-unit { font-family: var(--font-display); font-size: 11px; font-weight: 500; color: var(--ink-dim); }
+  .readout-value-alarm { color: var(--red-dim); font-weight: 700; }
+  .readout-unit { font-family: var(--font-display); font-size: 11px; font-weight: 700; color: var(--ink-dim); }
+
+  /* .readout-card has clip-path (chamfered corners), which clips box-shadow too - the alarm
+     glow goes on this unclipped outer wrapper instead so it can bleed past the panel edges. */
+  .readout-outer { border-radius: 8px; }
+  .readout-alarm { animation: readout-alarm-glow 1s ease-in-out infinite; }
+  @keyframes readout-alarm-glow {
+    0%, 100% { box-shadow: 0 0 10px 2px rgba(255, 61, 46, 0.6), 0 0 0 0 rgba(255, 61, 46, 0.5); }
+    50%      { box-shadow: 0 0 26px 8px rgba(255, 61, 46, 1), 0 0 0 6px rgba(255, 61, 46, 0.18); }
+  }
 
   /* Extraction table */
   .extraction-wrap { margin-bottom: 12px; padding: 12px 14px; }
@@ -827,8 +843,8 @@
   /* SVG classes */
   .axis      { stroke: var(--steel-900); stroke-width: 1; }
   .grid-line { stroke: rgba(0, 0, 0, 0.08); stroke-width: 1; }
-  .axis-tick  { font-family: var(--font-mono); font-size: 11px; fill: var(--ink-dim); }
-  .axis-label { font-family: var(--font-display); font-size: 12px; fill: var(--ink-dim); }
+  .axis-tick  { font-family: var(--font-mono); font-size: 11px; font-weight: 700; fill: var(--ink-dim); }
+  .axis-label { font-family: var(--font-display); font-size: 12px; font-weight: 700; fill: var(--ink-dim); }
 
   .dome      { fill: none; stroke: var(--teal-dim); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 2px rgba(20, 184, 166, 0.3)); }
 
@@ -846,7 +862,7 @@
 
   /* State visibility accordion content */
   .selection-hint {
-    font-size: 11.5px; color: var(--ink-dim); margin: 0 0 10px; line-height: 1.45;
+    font-size: 11.5px; font-weight: 700; color: var(--ink-dim); margin: 0 0 10px; line-height: 1.45;
   }
   .extraction-groups { display: flex; flex-direction: column; gap: 8px; }
   .ex-group { display: flex; align-items: flex-start; gap: 8px; }
@@ -858,7 +874,7 @@
   .ex-checks { display: flex; flex-direction: column; gap: 4px; flex: 1; }
   .sel-item {
     display: flex; align-items: flex-start; gap: 6px;
-    cursor: pointer; font-size: 12px; color: var(--ink); line-height: 1.35;
+    cursor: pointer; font-size: 12px; font-weight: 700; color: var(--ink); line-height: 1.35;
   }
   .sel-item input[type="checkbox"] {
     margin-top: 2px; accent-color: var(--blue); flex-shrink: 0; cursor: pointer;
@@ -873,12 +889,17 @@
     background: var(--blue);
     box-shadow: 0 0 0 1.5px rgba(111, 178, 238, 0.55), 0 0 7px 3px rgba(111, 178, 238, 0.85);
   }
+  /* Deselected: lit indicator goes dark, like an unpowered LED - no glow, no color. */
+  .sel-dot-off {
+    background: #9a9d9a;
+    box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.15);
+  }
   .sel-label { flex: 1; }
 
   /* Legend */
   .diagram-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 9px; }
   .leg {
-    font-size: 12px; color: var(--ink-dim);
+    font-size: 12px; font-weight: 700; color: var(--ink-dim);
     display: flex; align-items: center; gap: 5px;
   }
   .leg::before { content: ''; display: inline-block; width: 18px; height: 2px; }
