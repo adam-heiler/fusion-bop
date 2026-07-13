@@ -397,7 +397,7 @@
         {/if}
       </div>
 
-      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.efficiencies} style="--slider-color: #6b7566">
+      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.efficiencies} style="--slider-color: #a06cd5">
         <button type="button" class="details-summary" aria-expanded={openSections.efficiencies} onclick={() => openSections.efficiencies = !openSections.efficiencies}>Isentropic efficiencies</button>
         {#if openSections.efficiencies}
         <div class="slider-body" transition:slide={{ duration: 200 }}>
@@ -461,7 +461,7 @@
       </div>
 
       {#if result}
-        <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.stateVis}>
+        <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.stateVis} style="--slider-color: #d9b829">
           <button type="button" class="details-summary" aria-expanded={openSections.stateVis} onclick={() => openSections.stateVis = !openSections.stateVis}>State visibility</button>
           {#if openSections.stateVis}
           <div class="slider-body" transition:slide={{ duration: 200 }}>
@@ -764,7 +764,8 @@
     margin-right: 8px;
     transition: background 0.2s ease, box-shadow 0.2s ease;
   }
-  .slider-open > .details-summary::before {
+  .slider-open > .details-summary::before,
+  .details-summary:hover::before {
     background: var(--slider-color, #8d9686);
     box-shadow:
       0 0 0 1.5px color-mix(in srgb, var(--slider-color, #8d9686) 55%, transparent),
