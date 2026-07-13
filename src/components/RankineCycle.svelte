@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { slide } from 'svelte/transition';
   import { initSolver, solveCycleAsync, minPCAsync, minPGAsync, maxPEAsync } from '../lib/solverWorkerClient.js';
   import Gauge from './Gauge.svelte';
 
@@ -185,6 +186,11 @@
     };
   }
 
+  // Accordion open/closed state, one entry per slider group
+  let openSections: Record<string, boolean> = $state({
+    steam: true, extraction: false, efficiencies: false, cooling: false, stateVis: false,
+  });
+
   // Extraction/drain state visibility toggles (X1/X2/X3, see NOTES.md)
   let showExtraction: Record<string, boolean> = $state({
     A1: true, A2: true, A3: true, A4: true, A5: true,
@@ -315,9 +321,10 @@
         <div class="order-warning chamfer-panel chamfer-sm"><span>{@html orderWarning}</span></div>
       {/if}
 
-      <details class="slider-details chamfer-panel chamfer-sm" style="--slider-color: #e8935f" open>
-        <summary class="details-summary">Steam conditions</summary>
-        <div class="slider-body">
+      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.steam} style="--slider-color: #e8935f">
+        <button type="button" class="details-summary" aria-expanded={openSections.steam} onclick={() => openSections.steam = !openSections.steam}>Steam conditions</button>
+        {#if openSections.steam}
+        <div class="slider-body" transition:slide={{ duration: 200 }}>
           <div class="slider-row">
             <div class="slider-label"><span>Steam generator outlet P₁</span><span class="slider-value">{P1} bar</span></div>
             <input id="r-p1" type="range" min="30" max="300" step="1" bind:value={P1} style="--pct: {pct(P1,30,300)}%" onchange={() => onPressureChange('P1')} />
@@ -351,11 +358,13 @@
             <input id="r-q" type="range" min="200" max="2000" step="50" bind:value={Q} onchange={runSolve} />
           </div>
         </div>
-      </details>
+        {/if}
+      </div>
 
-      <details class="slider-details chamfer-panel chamfer-sm" style="--slider-color: #1a9b73">
-        <summary class="details-summary">Extraction pressures and feedwater heating</summary>
-        <div class="slider-body">
+      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.extraction} style="--slider-color: #1a9b73">
+        <button type="button" class="details-summary" aria-expanded={openSections.extraction} onclick={() => openSections.extraction = !openSections.extraction}>Extraction pressures and feedwater heating</button>
+        {#if openSections.extraction}
+        <div class="slider-body" transition:slide={{ duration: 200 }}>
           <div class="slider-row">
             <div class="slider-label"><span>P<sub>B</sub> (FWH5 / HP bleed)</span><span class="slider-value">{P_B} bar</span></div>
             <input id="r-pb" type="range" min="50" max="150" step="1" bind:value={P_B} style="--pct: {pct(P_B,50,150)}%" onchange={() => onPressureChange('P_B')} />
@@ -385,11 +394,13 @@
             <input id="r-ttd" type="range" min="0" max="15" step="0.5" bind:value={TTD} onchange={onTTDChange} />
           </div>
         </div>
-      </details>
+        {/if}
+      </div>
 
-      <details class="slider-details chamfer-panel chamfer-sm" style="--slider-color: #6b7566">
-        <summary class="details-summary">Isentropic efficiencies</summary>
-        <div class="slider-body">
+      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.efficiencies} style="--slider-color: #6b7566">
+        <button type="button" class="details-summary" aria-expanded={openSections.efficiencies} onclick={() => openSections.efficiencies = !openSections.efficiencies}>Isentropic efficiencies</button>
+        {#if openSections.efficiencies}
+        <div class="slider-body" transition:slide={{ duration: 200 }}>
           <div class="slider-row">
             <div class="slider-label"><span>η HP turbine</span><span class="slider-value">{(eta_HP*100).toFixed(0)} %</span></div>
             <input id="r-etahp" type="range" min="0.5" max="1" step="0.01" bind:value={eta_HP} onchange={runSolve} />
@@ -411,11 +422,13 @@
             <input id="r-gen" type="range" min="0.95" max="1" step="0.001" bind:value={eta_gen} onchange={runSolve} />
           </div>
         </div>
-      </details>
+        {/if}
+      </div>
 
-      <details class="slider-details chamfer-panel chamfer-sm" style="--slider-color: #5ba3e8">
-        <summary class="details-summary">Cooling / environment</summary>
-        <div class="slider-body">
+      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.cooling} style="--slider-color: #5ba3e8">
+        <button type="button" class="details-summary" aria-expanded={openSections.cooling} onclick={() => openSections.cooling = !openSections.cooling}>Cooling / environment</button>
+        {#if openSections.cooling}
+        <div class="slider-body" transition:slide={{ duration: 200 }}>
           <div class="slider-row">
             <div class="slider-label"><span>Ambient temp T₀</span><span class="slider-value">{T0} °C</span></div>
             <input id="r-t0" type="range" min="0" max="40" step="1" bind:value={T0} onchange={runSolve} />
@@ -444,12 +457,14 @@
             </p>
           {/if}
         </div>
-      </details>
+        {/if}
+      </div>
 
       {#if result}
-        <details class="slider-details chamfer-panel chamfer-sm">
-          <summary class="details-summary">State visibility</summary>
-          <div class="slider-body">
+        <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.stateVis}>
+          <button type="button" class="details-summary" aria-expanded={openSections.stateVis} onclick={() => openSections.stateVis = !openSections.stateVis}>State visibility</button>
+          {#if openSections.stateVis}
+          <div class="slider-body" transition:slide={{ duration: 200 }}>
             <p class="selection-hint">
               States 1-15 are always shown. Toggle extraction steam (X1, orange) and
               drain states (X2/X3, blue) below.
@@ -472,7 +487,8 @@
               {/each}
             </div>
           </div>
-        </details>
+          {/if}
+        </div>
 
       {/if}
     </div>
@@ -736,20 +752,25 @@
     text-transform: uppercase; color: var(--ink);
     padding: 9px 12px; margin: 0;
     cursor: pointer; user-select: none; transition: color 0.15s;
-    list-style: none; display: flex; justify-content: space-between; align-items: center;
+    background: none; border: none; width: 100%;
+    display: flex; justify-content: space-between; align-items: center;
   }
   .details-summary::before {
     content: '';
     display: inline-block;
     width: 7px; height: 7px; border-radius: 50%;
+    background: #9a9d9a;
+    box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.15);
+    margin-right: 8px;
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+  }
+  .slider-open > .details-summary::before {
     background: var(--slider-color, #8d9686);
     box-shadow:
       0 0 0 1.5px color-mix(in srgb, var(--slider-color, #8d9686) 55%, transparent),
       0 0 6px 2px color-mix(in srgb, var(--slider-color, #8d9686) 85%, transparent);
-    margin-right: 8px;
   }
   .details-summary:hover { color: var(--paper); }
-  .details-summary::-webkit-details-marker { display: none; }
   .details-summary::after {
     content: ''; width: 0; height: 0; flex-shrink: 0;
     border-style: solid;
@@ -757,7 +778,7 @@
     border-color: transparent transparent transparent var(--slider-color, #8d9686);
     transition: transform 0.15s ease;
   }
-  .slider-details[open] > .details-summary::after { transform: rotate(90deg); }
+  .slider-open > .details-summary::after { transform: rotate(90deg); }
   .slider-body { padding: 2px 12px 14px; }
 
   /* Emergent condenser metrics helper line under the cooling sliders */
