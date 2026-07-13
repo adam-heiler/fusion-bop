@@ -2,7 +2,31 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 <BaseLayout title="He Brayton">
-  <h1 class="text-3xl font-bold">Supercritical He Brayton Cycle</h1>
-  <p>Static background content goes here.</p>
-  <!-- He Brayton Svelte component goes here, client:only -->
+  <div style="max-width: 1700px; margin: 0 auto;">
+    <p class="mb-6" style="color: #8b948c; font-size: 14px;">
+      Closed-loop helium Brayton cycle: multi-stage intercooled compression, recuperator,
+      gas-cooled precooler. Interactive simulator coming soon.
+    </p>
+    <div class="drafting-mat chamfer-panel chamfer-all" style="max-width: 1153px; margin: 0 auto 28px;">
+      <div class="drafting-panel">
+        <span class="drafting-frame"></span>
+        <span class="drafting-corner tl"></span>
+        <span class="drafting-corner tr"></span>
+        <span class="drafting-corner bl"></span>
+        <span class="drafting-corner br"></span>
+        <img src="/diagrams/fusion-he-brayton.png" alt="Process flow diagram of the closed-loop helium Brayton cycle balance of plant" />
+        <div class="drafting-titleblock">
+          <div class="tb-title">
+            <span class="tb-line1">FUSION BOP</span>
+            <span class="tb-line2">He BRAYTON CYCLE PROCESS FLOW DIAGRAM</span>
+          </div>
+          <div class="tb-meta">
+            <div class="tb-row"><span class="tb-key">DWG NO.</span><span class="tb-val">HEBRAY&#8209;01</span></div>
+            <div class="tb-row"><span class="tb-key">REV</span><span class="tb-val">A</span></div>
+            <div class="tb-row"><span class="tb-key">SCALE</span><span class="tb-val">NTS</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </BaseLayout>
