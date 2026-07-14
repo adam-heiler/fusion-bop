@@ -215,8 +215,8 @@
     font-weight: 700;
   }
 
-  .th-slider { --slider-color: #e8935f; }
-  .tc-slider { --slider-color: #5ba3e8; }
+  .th-slider { --slider-color: #e8935f; --slider-tint: rgba(232, 147, 95, 0.2); }
+  .tc-slider { --slider-color: #5ba3e8; --slider-tint: rgba(91, 163, 232, 0.2); }
 
   .gauge-grid {
     display: grid;

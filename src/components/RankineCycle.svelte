@@ -190,6 +190,10 @@
   let openSections: Record<string, boolean> = $state({
     steam: true, extraction: false, efficiencies: false, cooling: false, stateVis: false,
   });
+  // Chevron points: right-pointing when closed, down-pointing when open.
+  function chevronPoints(open: boolean) {
+    return open ? '2,3 5,7 8,3' : '3,2 7,5 3,8';
+  }
 
   // Extraction/drain state visibility toggles (X1/X2/X3, see NOTES.md)
   let showExtraction: Record<string, boolean> = $state({
@@ -321,8 +325,14 @@
         <div class="order-warning chamfer-panel chamfer-sm"><span>{@html orderWarning}</span></div>
       {/if}
 
-      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.steam} style="--slider-color: #e8935f">
-        <button type="button" class="details-summary" aria-expanded={openSections.steam} onclick={() => openSections.steam = !openSections.steam}>Steam conditions</button>
+      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.steam} style="--slider-color: #e8935f; --slider-tint: rgba(232, 147, 95, 0.2); --slider-glow-1: rgba(232, 147, 95, 0.55); --slider-glow-2: rgba(232, 147, 95, 0.85)">
+        <button type="button" class="details-summary" aria-expanded={openSections.steam} onclick={() => openSections.steam = !openSections.steam}>
+          Steam conditions
+          <svg class="chevron" viewBox="0 0 10 10" width="10" height="10">
+            <polyline points={chevronPoints(openSections.steam)} class="chevron-bg" />
+            <polyline points={chevronPoints(openSections.steam)} class="chevron-fg" />
+          </svg>
+        </button>
         {#if openSections.steam}
         <div class="slider-body" transition:slide={{ duration: 200 }}>
           <div class="slider-row">
@@ -361,8 +371,14 @@
         {/if}
       </div>
 
-      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.extraction} style="--slider-color: #1a9b73">
-        <button type="button" class="details-summary" aria-expanded={openSections.extraction} onclick={() => openSections.extraction = !openSections.extraction}>Extraction pressures and feedwater heating</button>
+      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.extraction} style="--slider-color: #1a9b73; --slider-tint: rgba(26, 155, 115, 0.2); --slider-glow-1: rgba(26, 155, 115, 0.55); --slider-glow-2: rgba(26, 155, 115, 0.85)">
+        <button type="button" class="details-summary" aria-expanded={openSections.extraction} onclick={() => openSections.extraction = !openSections.extraction}>
+          Extraction pressures and feedwater heating
+          <svg class="chevron" viewBox="0 0 10 10" width="10" height="10">
+            <polyline points={chevronPoints(openSections.extraction)} class="chevron-bg" />
+            <polyline points={chevronPoints(openSections.extraction)} class="chevron-fg" />
+          </svg>
+        </button>
         {#if openSections.extraction}
         <div class="slider-body" transition:slide={{ duration: 200 }}>
           <div class="slider-row">
@@ -397,8 +413,14 @@
         {/if}
       </div>
 
-      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.efficiencies} style="--slider-color: #a06cd5">
-        <button type="button" class="details-summary" aria-expanded={openSections.efficiencies} onclick={() => openSections.efficiencies = !openSections.efficiencies}>Isentropic efficiencies</button>
+      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.efficiencies} style="--slider-color: #a06cd5; --slider-tint: rgba(160, 108, 213, 0.2); --slider-glow-1: rgba(160, 108, 213, 0.55); --slider-glow-2: rgba(160, 108, 213, 0.85)">
+        <button type="button" class="details-summary" aria-expanded={openSections.efficiencies} onclick={() => openSections.efficiencies = !openSections.efficiencies}>
+          Isentropic efficiencies
+          <svg class="chevron" viewBox="0 0 10 10" width="10" height="10">
+            <polyline points={chevronPoints(openSections.efficiencies)} class="chevron-bg" />
+            <polyline points={chevronPoints(openSections.efficiencies)} class="chevron-fg" />
+          </svg>
+        </button>
         {#if openSections.efficiencies}
         <div class="slider-body" transition:slide={{ duration: 200 }}>
           <div class="slider-row">
@@ -425,8 +447,14 @@
         {/if}
       </div>
 
-      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.cooling} style="--slider-color: #5ba3e8">
-        <button type="button" class="details-summary" aria-expanded={openSections.cooling} onclick={() => openSections.cooling = !openSections.cooling}>Cooling / environment</button>
+      <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.cooling} style="--slider-color: #5ba3e8; --slider-tint: rgba(91, 163, 232, 0.2); --slider-glow-1: rgba(91, 163, 232, 0.55); --slider-glow-2: rgba(91, 163, 232, 0.85)">
+        <button type="button" class="details-summary" aria-expanded={openSections.cooling} onclick={() => openSections.cooling = !openSections.cooling}>
+          Cooling / environment
+          <svg class="chevron" viewBox="0 0 10 10" width="10" height="10">
+            <polyline points={chevronPoints(openSections.cooling)} class="chevron-bg" />
+            <polyline points={chevronPoints(openSections.cooling)} class="chevron-fg" />
+          </svg>
+        </button>
         {#if openSections.cooling}
         <div class="slider-body" transition:slide={{ duration: 200 }}>
           <div class="slider-row">
@@ -461,8 +489,14 @@
       </div>
 
       {#if result}
-        <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.stateVis} style="--slider-color: #d9b829">
-          <button type="button" class="details-summary" aria-expanded={openSections.stateVis} onclick={() => openSections.stateVis = !openSections.stateVis}>State visibility</button>
+        <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.stateVis} style="--slider-color: #d9b829; --slider-tint: rgba(217, 184, 41, 0.2); --slider-glow-1: rgba(217, 184, 41, 0.55); --slider-glow-2: rgba(217, 184, 41, 0.85)">
+          <button type="button" class="details-summary" aria-expanded={openSections.stateVis} onclick={() => openSections.stateVis = !openSections.stateVis}>
+            State visibility
+            <svg class="chevron" viewBox="0 0 10 10" width="10" height="10">
+              <polyline points={chevronPoints(openSections.stateVis)} class="chevron-bg" />
+              <polyline points={chevronPoints(openSections.stateVis)} class="chevron-fg" />
+            </svg>
+          </button>
           {#if openSections.stateVis}
           <div class="slider-body" transition:slide={{ duration: 200 }}>
             <p class="selection-hint">
@@ -767,8 +801,8 @@
   .slider-open > .details-summary::before {
     background: var(--slider-color, #8d9686);
     box-shadow:
-      0 0 0 1.5px color-mix(in srgb, var(--slider-color, #8d9686) 55%, transparent),
-      0 0 6px 2px color-mix(in srgb, var(--slider-color, #8d9686) 85%, transparent);
+      0 0 0 1.5px var(--slider-glow-1, rgba(141, 150, 134, 0.55)),
+      0 0 6px 2px var(--slider-glow-2, rgba(141, 150, 134, 0.85));
   }
   /* Hover-only affordance glow, gated to real pointer devices: touchscreens have no true
      hover-exit event, so a tap that closes the section would otherwise leave this "stuck" on. */
@@ -776,23 +810,19 @@
     .details-summary:hover::before {
       background: var(--slider-color, #8d9686);
       box-shadow:
-        0 0 0 1.5px color-mix(in srgb, var(--slider-color, #8d9686) 55%, transparent),
-        0 0 6px 2px color-mix(in srgb, var(--slider-color, #8d9686) 85%, transparent);
+        0 0 0 1.5px var(--slider-glow-1, rgba(141, 150, 134, 0.55)),
+        0 0 6px 2px var(--slider-glow-2, rgba(141, 150, 134, 0.85));
     }
     .details-summary:hover { color: var(--paper); }
   }
-  .details-summary::after {
-    content: '';
-    display: inline-block;
-    width: 8px; height: 8px; flex-shrink: 0;
-    border-style: solid;
-    border-width: 0 3px 3px 0;
-    border-color: var(--slider-color, #8d9686);
-    filter: drop-shadow(0 0 0.75px #6b7278) drop-shadow(0 0 0.75px #6b7278);
-    transform: rotate(-45deg);
-    transition: transform 0.15s ease;
-    margin-left: 8px;
-  }
+  /* Chevron drawn as two stacked SVG strokes (grey behind, coloured on top) rather than a
+     rotated border-corner box with filter: drop-shadow() - that combination (filter applied
+     to a rotated, non-rectangular alpha shape) renders with a visible gap at the corner on
+     some real phone browsers. Plain SVG strokes don't have that failure mode, and swapping
+     the two points sets directly (open vs closed) sidesteps needing to animate a rotation. */
+  .details-summary .chevron { flex-shrink: 0; margin-left: 8px; }
+  .chevron-bg { fill: none; stroke: #6b7278; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+  .chevron-fg { fill: none; stroke: var(--slider-color, #8d9686); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .slider-open > .details-summary::after { transform: rotate(45deg); }
   .slider-body { padding: 2px 12px 14px; }
 

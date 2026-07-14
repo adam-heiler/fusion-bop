@@ -240,13 +240,16 @@ input[type="range"]::-webkit-slider-runnable-track {
 /* Knob tinted to match each slider's own --slider-color: a neutral (silver) base photo
    keeps its metallic shading/highlights, and background-blend-mode: color takes hue/
    saturation from the solid layer above while keeping the photo's luminosity - a tinted
-   gold/copper knob would skew every tint warm, so silver is the right base to recolor. */
+   gold/copper knob would skew every tint warm, so silver is the right base to recolor.
+   Uses --slider-tint (a plain rgba() set alongside --slider-color at each slider group)
+   instead of color-mix() - color-mix() support is inconsistent on real phone browsers,
+   and when it fails the whole background-image value is dropped, not just the tint. */
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background-image: linear-gradient(color-mix(in srgb, var(--slider-color, #14b8a6) 20%, transparent), color-mix(in srgb, var(--slider-color, #14b8a6) 20%, transparent)), url('/buttons/knob-silver.png');
+  background-image: linear-gradient(var(--slider-tint, rgba(20, 184, 166, 0.2)), var(--slider-tint, rgba(20, 184, 166, 0.2))), url('/buttons/knob-silver.png');
   background-size: 100% 100%, cover;
   background-blend-mode: color;
   box-shadow: 0 2px 3px rgba(0, 0, 0, 0.5); /* not filter: drop-shadow - cheaper to animate */
@@ -278,7 +281,7 @@ input[type="range"]::-moz-range-thumb {
   height: 20px;
   border-radius: 50%;
   border: none;
-  background-image: linear-gradient(color-mix(in srgb, var(--slider-color, #14b8a6) 20%, transparent), color-mix(in srgb, var(--slider-color, #14b8a6) 20%, transparent)), url('/buttons/knob-silver.png');
+  background-image: linear-gradient(var(--slider-tint, rgba(20, 184, 166, 0.2)), var(--slider-tint, rgba(20, 184, 166, 0.2))), url('/buttons/knob-silver.png');
   background-size: 100% 100%, cover;
   background-blend-mode: color;
   box-shadow: 0 2px 3px rgba(0, 0, 0, 0.5);
