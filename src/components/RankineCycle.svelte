@@ -764,22 +764,36 @@
     margin-right: 8px;
     transition: background 0.2s ease, box-shadow 0.2s ease;
   }
-  .slider-open > .details-summary::before,
-  .details-summary:hover::before {
+  .slider-open > .details-summary::before {
     background: var(--slider-color, #8d9686);
     box-shadow:
       0 0 0 1.5px color-mix(in srgb, var(--slider-color, #8d9686) 55%, transparent),
       0 0 6px 2px color-mix(in srgb, var(--slider-color, #8d9686) 85%, transparent);
   }
-  .details-summary:hover { color: var(--paper); }
-  .details-summary::after {
-    content: ''; width: 0; height: 0; flex-shrink: 0;
-    border-style: solid;
-    border-width: 5px 0 5px 7px;
-    border-color: transparent transparent transparent var(--slider-color, #8d9686);
-    transition: transform 0.15s ease;
+  /* Hover-only affordance glow, gated to real pointer devices: touchscreens have no true
+     hover-exit event, so a tap that closes the section would otherwise leave this "stuck" on. */
+  @media (hover: hover) and (pointer: fine) {
+    .details-summary:hover::before {
+      background: var(--slider-color, #8d9686);
+      box-shadow:
+        0 0 0 1.5px color-mix(in srgb, var(--slider-color, #8d9686) 55%, transparent),
+        0 0 6px 2px color-mix(in srgb, var(--slider-color, #8d9686) 85%, transparent);
+    }
+    .details-summary:hover { color: var(--paper); }
   }
-  .slider-open > .details-summary::after { transform: rotate(90deg); }
+  .details-summary::after {
+    content: '';
+    display: inline-block;
+    width: 8px; height: 8px; flex-shrink: 0;
+    border-style: solid;
+    border-width: 0 3px 3px 0;
+    border-color: var(--slider-color, #8d9686);
+    filter: drop-shadow(0 0 0.75px #6b7278) drop-shadow(0 0 0.75px #6b7278);
+    transform: rotate(-45deg);
+    transition: transform 0.15s ease;
+    margin-left: 8px;
+  }
+  .slider-open > .details-summary::after { transform: rotate(45deg); }
   .slider-body { padding: 2px 12px 14px; }
 
   /* Emergent condenser metrics helper line under the cooling sliders */

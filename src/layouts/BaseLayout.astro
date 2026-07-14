@@ -29,12 +29,12 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
       </button>
 
       <div class="nav-links" id="nav-links">
-        <a href="/" aria-current={isCurrent('/') ? 'page' : undefined}>Overview</a>
-        <a href="/thermo-background" aria-current={isCurrent('/thermo-background') ? 'page' : undefined}>Thermodynamics Background</a>
-        <a href="/tokamak-systems" aria-current={isCurrent('/tokamak-systems') ? 'page' : undefined}>Tokamak Systems</a>
-        <a href="/rankine" aria-current={isCurrent('/rankine') ? 'page' : undefined}>H<sub>2</sub>O Rankine</a>
-        <a href="/co2-brayton" aria-current={isCurrent('/co2-brayton') ? 'page' : undefined}>CO<sub>2</sub>&nbsp;Brayton</a>
-        <a href="/he-brayton" aria-current={isCurrent('/he-brayton') ? 'page' : undefined}>He Brayton</a>
+        <a href="/" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/') ? 'page' : undefined}><span>Overview</span></a>
+        <a href="/thermo-background" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/thermo-background') ? 'page' : undefined}><span>Thermodynamics Background</span></a>
+        <a href="/tokamak-systems" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/tokamak-systems') ? 'page' : undefined}><span>Tokamak Systems</span></a>
+        <a href="/rankine" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/rankine') ? 'page' : undefined}><span>H<sub>2</sub>O Rankine</span></a>
+        <a href="/co2-brayton" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/co2-brayton') ? 'page' : undefined}><span>CO<sub>2</sub>&nbsp;Brayton</span></a>
+        <a href="/he-brayton" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/he-brayton') ? 'page' : undefined}><span>He Brayton</span></a>
       </div>
     </nav>
     <div class="nav-scrim" id="nav-scrim"></div>
@@ -170,46 +170,25 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
     gap: 0.4rem;
   }
 
-  /* Nav links: metal button cap fades in on hover via ::before, out on leave. */
+  /* Nav links: same chamfered-metal chip chrome as the reset button (compare
+     RankineCycle.svelte's .reset-btn) - a persistent raised chip, not just a hover pill. */
   .site-nav .nav-links a {
-    position: relative;
-    isolation: isolate;
     display: inline-flex;
     align-items: center;
-    padding: 0.45rem 0.9rem;
+    padding: 0.4rem 0.85rem;
     font-size: 0.85rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     color: var(--ink);
     text-decoration: none;
     white-space: nowrap;
-    transition: color 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-
-  .site-nav .nav-links a::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: 999px;
-    background-image:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 45%, rgba(0, 0, 0, 0.06)),
-      var(--stainless);
-    background-size: 100% 100%, cover;
-    background-position: center, center;
-    border: 1px solid rgba(20, 24, 26, 0.2);
-    box-shadow: 0 2px 4px rgba(20, 24, 26, 0.35), 0 1px 0 rgba(255, 255, 255, 0.5);
-    opacity: 0;
-    transition: opacity 0.25s ease;
+    cursor: pointer;
+    transition: color 0.15s ease, transform 0.15s ease, filter 0.15s ease;
   }
 
   .site-nav .nav-links a:hover {
-    color: #262b2e;
-    transform: translateY(-1px);
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
-  }
-  .site-nav .nav-links a:hover::before {
-    opacity: 1;
+    color: var(--teal-dim);
+    filter: brightness(1.08);
   }
   /* Click flash: a brief, bright teal glow (the same teal as "BoP" in the
      logo) at the instant of clicking, on top of the existing press-down. */
@@ -297,14 +276,7 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
       overflow-y: auto;
     }
     .site-nav .nav-links.open { transform: translateX(0); }
-    /* Touch has no hover to reveal the button chrome with, so keep it
-       always visible here rather than invisible-until-hover like desktop. */
-    .site-nav .nav-links a { width: 100%; margin-bottom: 0.35rem; color: #262b2e; }
-    .site-nav .nav-links a::before { opacity: 1; }
-    .site-nav .nav-links a:hover {
-      filter: brightness(1.08);
-      transform: none;
-    }
+    .site-nav .nav-links a { width: 100%; margin-bottom: 0.35rem; justify-content: center; }
     .nav-toggle { display: flex; }
   }
 </style>
