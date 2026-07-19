@@ -908,7 +908,7 @@
   .details-summary::before {
     content: '';
     display: inline-block;
-    width: 7px; height: 7px; border-radius: 50%;
+    width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0;
     background: #9a9d9a;
     box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.15);
     margin-right: 8px;
@@ -1062,7 +1062,7 @@
     margin-top: 2px; accent-color: var(--blue); flex-shrink: 0; cursor: pointer;
   }
   .sel-dot {
-    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block; width: 8px; height: 8px; border-radius: 2px;
     background: var(--amber); border: 1px solid #000; flex-shrink: 0; margin-top: 3px;
     /* Solid ring + soft halo - a plain blur glow doesn't read on this light background. */
     box-shadow: 0 0 0 1.5px rgba(242, 172, 65, 0.55), 0 0 7px 3px rgba(242, 172, 65, 0.85);

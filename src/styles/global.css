@@ -29,8 +29,8 @@
   --aluminum: url('/textures/brushed-aluminum.webp'); /* never tiled, always background-size: cover */
   --stainless: url('/textures/stainless-steel.webp'); /* grain-free, safe for small/stretched crops */
 
-  --font-display: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
-  --font-mono: 'Helvetica Neue Condensed', 'Helvetica Neue', 'Helvetica', 'Arial Narrow', sans-serif;
+  --font-display: 'Inter', 'Segoe UI', sans-serif;
+  --font-mono: 'Inter Tight', 'Inter', 'Segoe UI', sans-serif;
 }
 
 html {

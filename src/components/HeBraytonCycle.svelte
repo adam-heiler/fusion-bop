@@ -614,7 +614,7 @@
   .details-summary::before {
     content: '';
     display: inline-block;
-    width: 7px; height: 7px; border-radius: 50%;
+    width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0;
     background: #9a9d9a;
     box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.15);
     margin-right: 8px;

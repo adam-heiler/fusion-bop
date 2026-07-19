@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import { ClientRouter } from 'astro:transitions';
 
 interface Props {
   title: string;
@@ -16,11 +17,12 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>{title} | Fusion BOP</title>
+    <ClientRouter />
   </head>
   <body class="min-h-screen">
-    <nav class="site-nav">
+    <nav class="site-nav" transition:persist="site-nav">
       <a href="/" class="site-logo"><span class="logo-text">Fusion<span class="logo-bop">BoP</span></span><img src="/logo.png" alt="" class="site-logo-mark" /></a>
       <span class="beta-badge">Beta</span>
 
@@ -37,7 +39,7 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
         <a href="/he-brayton" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/he-brayton') ? 'page' : undefined}><span>He Brayton</span></a>
       </div>
     </nav>
-    <div class="nav-scrim" id="nav-scrim"></div>
+    <div class="nav-scrim" id="nav-scrim" transition:persist="nav-scrim"></div>
     <main class="p-6">
       <slot />
     </main>
@@ -91,6 +93,22 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
   navScrim?.addEventListener('click', () => setNavOpen(false));
   navLinks?.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setNavOpen(false)));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') setNavOpen(false); });
+
+  // The nav is transition:persist-ed across client-side navigations, so its
+  // server-rendered aria-current goes stale - recompute it after each swap.
+  function updateCurrentLink() {
+    const path = location.pathname;
+    navLinks?.querySelectorAll('a').forEach(a => {
+      const href = a.getAttribute('href') ?? '';
+      const current = path === href || (href !== '/' && path.startsWith(href));
+      if (current) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+  }
+  document.addEventListener('astro:page-load', () => {
+    updateCurrentLink();
+    setNavOpen(false);
+  });
 </script>
 
 <style is:global>
