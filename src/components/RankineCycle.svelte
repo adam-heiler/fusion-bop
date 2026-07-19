@@ -224,7 +224,7 @@
 
   // Accordion open/closed state, one entry per slider group
   let openSections: Record<string, boolean> = $state({
-    steam: true, extraction: true, efficiencies: true, cooling: true, stateVis: true,
+    steam: false, extraction: false, efficiencies: false, cooling: false, stateVis: false,
   });
   // Chevron points: right-pointing when closed, down-pointing when open.
   function chevronPoints(open: boolean) {

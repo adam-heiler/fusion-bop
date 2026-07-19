@@ -98,7 +98,7 @@
   }
 
   let openSections: Record<string, boolean> = $state({
-    gas: true, regen: true, efficiencies: true, cooling: true,
+    gas: false, regen: false, efficiencies: false, cooling: false,
   });
   function chevronPoints(open: boolean) {
     return open ? '2,3 5,7 8,3' : '3,2 7,5 3,8';
