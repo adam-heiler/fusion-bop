@@ -13,8 +13,8 @@ self.onmessage = async (e) => {
       const { P_D, TTD, eta_pump } = e.data;
       self.postMessage({ id, value: minPC(P_D, TTD, eta_pump) });
     } else if (type === 'minPG') {
-      const { T6C_est, TTD, eta_pump } = e.data;
-      self.postMessage({ id, value: minPG(T6C_est, TTD, eta_pump) });
+      const { T6C_est, TTD, eta_pump, Pcond } = e.data;
+      self.postMessage({ id, value: minPG(T6C_est, TTD, eta_pump, Pcond) });
     } else if (type === 'maxPE') {
       const { TTD, Pcond } = e.data;
       self.postMessage({ id, value: maxPE(TTD, Pcond) });

@@ -4,10 +4,13 @@
   import { initSolver, solveCycleAsync, minPCAsync, minPGAsync, maxPEAsync } from '../lib/solverWorkerClient.js';
   import Gauge from './Gauge.svelte';
 
-  // Slider defaults, also used by the Reset button below.
+  // Slider defaults, also used by the Reset button below. Pressures: MPa for
+  // the high-pressure sliders (P1/P_VA/P_B/P2), kPa for the rest. Temperatures
+  // in °C - the convention thermo water tables use.
   const DEFAULTS = {
-    P1: 250, T1: 540, T3: 500, P2: 60, P4: 5, reheat_dP_pct: 3,
-    P_VA: 117, P_B: 100, P_C: 7.5, P_D: 6, P_E: 4.3, P_F: 2.2, P_G: 1.5,
+    P1: 25, T1: 540, T3: 500, P2: 6, P4: 500, reheat_dP_pct: 3,
+    P_VA: 11.7, P_B: 10, P_C: 750, P_D: 600, P_E: 430, P_F: 220, P_G: 150,
+    P_condpump: 650,
     Q: 1000,
     eta_HP: 0.85, eta_IP: 0.85, eta_LP: 0.85, eta_pump: 0.85, eta_gen: 0.985,
     TTD: 2.8, T0: 25, RH: 50, cw_approach: 3.1,
@@ -28,6 +31,7 @@
   let P_E           = $state(DEFAULTS.P_E);
   let P_F           = $state(DEFAULTS.P_F);
   let P_G           = $state(DEFAULTS.P_G);
+  let P_condpump    = $state(DEFAULTS.P_condpump);
   let Q             = $state(DEFAULTS.Q);
   let eta_HP   = $state(DEFAULTS.eta_HP);
   let eta_IP   = $state(DEFAULTS.eta_IP);
@@ -41,16 +45,17 @@
   let r_cw        = $state(DEFAULTS.r_cw);
   let UA          = $state(DEFAULTS.UA);
 
+  // Pa/K directly - these are solver-only constants, never shown as sliders.
   const FIXED = {
-    P_condpump: 5, P_feedpump: 250, subcool: 2.8,
+    P_feedpump: 25e6, subcool: 2.8,
   };
 
-  const PCRIT = 220.64;
+  const PCRIT = 22.064; // MPa
   const isSupercritical = $derived(P1 >= PCRIT);
 
   // Pressure ordering enforcement. Required chain: P1 > P_VA > P_B > P2 > P_C >
   // P_D > P4 > P_E > P_F > P_G. See NOTES.md for why.
-  const GAP = 0.1; // bar, minimum enforced separation between chain neighbors
+  const GAP = 1e4; // Pa (10 kPa), minimum enforced separation between chain neighbors
 
   let orderWarning = $state('');
   let warnTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -67,35 +72,48 @@
     return m ? `P<sub>${m[1]}</sub>` : name;
   }
 
-  // Minimum P_C keeping FWH4's extraction fraction non-negative.
+  // Minimum P_C keeping FWH4's extraction fraction non-negative. P_C is kPa
+  // in component state; the solver wants Pa.
   async function minPC(): Promise<number> {
-    return minPCAsync(P_D, TTD, eta_pump);
+    const pa = await minPCAsync(P_D * 1e3, TTD, eta_pump);
+    return pa / 1e3;
   }
 
-  // Minimum P_G keeping FWH1's extraction fraction non-negative.
+  // Minimum P_G keeping FWH1's extraction fraction non-negative. Depends on
+  // the condensate pump's discharge pressure (P_condpump), since that's the
+  // pressure FWH1's tube side is compressed to.
   async function minPG(): Promise<number> {
     const T6C_est = result ? result.T6C : (25 + cw_approach + 13);
-    return minPGAsync(T6C_est, TTD, eta_pump);
+    const pa = await minPGAsync(T6C_est, TTD, eta_pump, P_condpump * 1e3);
+    return pa / 1e3;
   }
 
-  // Maximum P_E before FWH3's feedwater outlet flashes to vapor.
+  // Maximum P_E before FWH3's feedwater outlet (at P_condpump) flashes to vapor.
   async function maxPE(): Promise<number> {
-    return maxPEAsync(TTD, FIXED.P_condpump);
+    const pa = await maxPEAsync(TTD, P_condpump * 1e3);
+    return pa / 1e3;
   }
 
+  // Chain get/set always operate in Pascals internally, regardless of which
+  // unit (MPa or kPa) a given slider displays - the ordering comparisons
+  // would otherwise be comparing across two different units. Rounding
+  // happens inside each setter, after converting back to the slider's own
+  // display unit (rounding the raw Pascal value first would be meaningless -
+  // 3 decimal places of a multi-million-Pascal number is far finer than the
+  // slider's own precision).
   type Chain = [string, () => number, (v: number) => void, number, number][];
   function getChain(): Chain {
     return [
-      ['P1',   () => P1,   v => P1 = v,   30, 300],
-      ['P_VA', () => P_VA, v => P_VA = v, 60, 200],
-      ['P_B',  () => P_B,  v => P_B = v,  50, 150],
-      ['P2',   () => P2,   v => P2 = v,   30, 100],
-      ['P_C',  () => P_C,  v => P_C = v,  4,  15],
-      ['P_D',  () => P_D,  v => P_D = v,  3,  12],
-      ['P4',   () => P4,   v => P4 = v,   2,  20],
-      ['P_E',  () => P_E,  v => P_E = v,  2,  8],
-      ['P_F',  () => P_F,  v => P_F = v,  1,  5],
-      ['P_G',  () => P_G,  v => P_G = v,  0.5, 3],
+      ['P1',   () => P1*1e6,   v => P1 = snap(v/1e6),   3e6,   30e6],
+      ['P_VA', () => P_VA*1e6, v => P_VA = snap(v/1e6), 6e6,   20e6],
+      ['P_B',  () => P_B*1e6,  v => P_B = snap(v/1e6),  5e6,   15e6],
+      ['P2',   () => P2*1e6,   v => P2 = snap(v/1e6),   3e6,   10e6],
+      ['P_C',  () => P_C*1e3,  v => P_C = snap(v/1e3),  4e5,   15e5],
+      ['P_D',  () => P_D*1e3,  v => P_D = snap(v/1e3),  3e5,   12e5],
+      ['P4',   () => P4*1e3,   v => P4 = snap(v/1e3),   2e5,   20e5],
+      ['P_E',  () => P_E*1e3,  v => P_E = snap(v/1e3),  2e5,   8e5],
+      ['P_F',  () => P_F*1e3,  v => P_F = snap(v/1e3),  1e5,   5e5],
+      ['P_G',  () => P_G*1e3,  v => P_G = snap(v/1e3),  0.5e5, 3e5],
     ];
   }
   const snap = (v: number) => +v.toFixed(3);
@@ -108,7 +126,7 @@
     const pcMin = await minPC();
     if (pcMin > 0 && P_C < pcMin) {
       P_C = snap(pcMin);
-      reasons.push(`${subLabel('P_C')} (FWH4) raised to ${P_C} bar - any lower and the deaerator would already be hotter than FWH4 could deliver, forcing its extraction flow negative.`);
+      reasons.push(`${subLabel('P_C')} (FWH4) raised to ${P_C} kPa - any lower and the deaerator would already be hotter than FWH4 could deliver, forcing its extraction flow negative.`);
       for (let i = chain.findIndex(([n]) => n === 'P_C') - 1; i >= 0; i--) {
         const [, get, set, lo, hi] = chain[i];
         const [, getBelow] = chain[i + 1];
@@ -118,7 +136,7 @@
     const pgMin = await minPG();
     if (pgMin > 0 && P_G < pgMin) {
       P_G = snap(pgMin);
-      reasons.push(`${subLabel('P_G')} (FWH1) raised to ${P_G} bar - any lower and the condenser would already be hotter than FWH1 could deliver, forcing its extraction flow negative.`);
+      reasons.push(`${subLabel('P_G')} (FWH1) raised to ${P_G} kPa - any lower and the condenser would already be hotter than FWH1 could deliver, forcing its extraction flow negative.`);
       for (let i = chain.findIndex(([n]) => n === 'P_G') - 1; i >= chain.findIndex(([n]) => n === 'P4'); i--) {
         const [, get, set, lo, hi] = chain[i];
         const [, getBelow] = chain[i + 1];
@@ -127,14 +145,27 @@
     }
     const peMax = await maxPE();
     if (peMax > 0 && P_E > peMax) {
+      // Chain bounds/GAP are Pascal-scale; peMax came back in kPa (P_E's own
+      // unit) from the wrapper above, so convert peLo/GAP to kPa here too.
       const [, , , peLo] = chain[chain.findIndex(([n]) => n === 'P_E')];
-      P_E = snap(Math.max(peLo, peMax - GAP));
-      reasons.push(`${subLabel('P_E')} (FWH3) lowered to ${P_E} bar - above this, the shell steam is hotter than the condensate line pressure can keep liquid, so the feedwater would flash to vapor inside the FWH3 tubes.`);
+      P_E = snap(Math.max(peLo / 1e3, peMax - GAP / 1e3));
+      reasons.push(`${subLabel('P_E')} (FWH3) lowered to ${P_E} kPa - above this, the shell steam is hotter than the condensate line pressure can keep liquid, so the feedwater would flash to vapor inside the FWH3 tubes.`);
       for (let i = chain.findIndex(([n]) => n === 'P_E') + 1; i < chain.length; i++) {
         const [, get, set, lo, hi] = chain[i];
         const [, getAbove] = chain[i - 1];
         if (get() >= getAbove() - GAP) set(snap(Math.min(hi, Math.max(lo, getAbove() - GAP))));
       }
+    }
+
+    // Condensate (at P_condpump) mixes directly into the deaerator (at P_D) with
+    // no pump modeled in between - it has to already be at or above deaerator
+    // pressure, or it couldn't physically flow in. Unlike the P_C/P_G/P_E
+    // checks above, this isn't a thermodynamic-property lookup, just a plain
+    // pressure comparison, so no async solver call is needed.
+    const pcondMin = P_D + GAP / 1e3;
+    if (P_condpump < pcondMin) {
+      P_condpump = snap(pcondMin);
+      reasons.push(`Condensate pump discharge P raised to ${P_condpump} kPa - any lower and the condensate couldn't physically flow into the deaerator, which sits at a higher pressure (P<sub>D</sub>).`);
     }
 
     return reasons;
@@ -176,10 +207,15 @@
     }
   }
 
+  // Converts component state (MPa/kPa) to the solver's Pa/degC contract -
+  // T1/T3/T0 pass straight through since the solver takes °C directly.
   function params() {
     return {
-      P1, T1, T3, P2, P4, reheat_dP_pct, P_VA,
-      P_B, P_C, P_D, P_E, P_F, P_G, Q,
+      P1: P1 * 1e6, T1, T3, P2: P2 * 1e6, P4: P4 * 1e3, reheat_dP_pct,
+      P_VA: P_VA * 1e6,
+      P_B: P_B * 1e6, P_C: P_C * 1e3, P_D: P_D * 1e3,
+      P_E: P_E * 1e3, P_F: P_F * 1e3, P_G: P_G * 1e3,
+      P_condpump: P_condpump * 1e3, Q,
       eta_HP, eta_IP, eta_LP, eta_pump, eta_gen, TTD,
       T0, RH, cw_approach, r_cw, UA: UA * 1e6,   // UA slider is MW/K -> W/K for the solver
       ...FIXED,
@@ -188,7 +224,7 @@
 
   // Accordion open/closed state, one entry per slider group
   let openSections: Record<string, boolean> = $state({
-    steam: true, extraction: false, efficiencies: false, cooling: false, stateVis: false,
+    steam: true, extraction: true, efficiencies: true, cooling: true, stateVis: true,
   });
   // Chevron points: right-pointing when closed, down-pointing when open.
   function chevronPoints(open: boolean) {
@@ -234,12 +270,21 @@
     runSolve();
   }
 
+  // Condensate pump discharge pressure moves the same P_G (min) and P_E (max)
+  // boundaries TTD does, since both minPG and maxPE are functions of it.
+  async function onCondPumpChange() {
+    const reasons = await enforceTTDBoundaries();
+    if (reasons.length) flagOrder(reasons.join(' '));
+    runSolve();
+  }
+
   // Restores every slider to DEFAULTS.
   function resetAll() {
     P1 = DEFAULTS.P1; T1 = DEFAULTS.T1; T3 = DEFAULTS.T3; P2 = DEFAULTS.P2; P4 = DEFAULTS.P4;
     reheat_dP_pct = DEFAULTS.reheat_dP_pct;
     P_VA = DEFAULTS.P_VA; P_B = DEFAULTS.P_B; P_C = DEFAULTS.P_C; P_D = DEFAULTS.P_D;
     P_E = DEFAULTS.P_E; P_F = DEFAULTS.P_F; P_G = DEFAULTS.P_G;
+    P_condpump = DEFAULTS.P_condpump;
     Q = DEFAULTS.Q;
     eta_HP = DEFAULTS.eta_HP; eta_IP = DEFAULTS.eta_IP; eta_LP = DEFAULTS.eta_LP;
     eta_pump = DEFAULTS.eta_pump; eta_gen = DEFAULTS.eta_gen;
@@ -336,8 +381,8 @@
         {#if openSections.steam}
         <div class="slider-body" transition:slide={{ duration: 200 }}>
           <div class="slider-row">
-            <div class="slider-label"><span>Steam generator outlet P₁</span><span class="slider-value">{P1} bar</span></div>
-            <input id="r-p1" type="range" min="30" max="300" step="1" bind:value={P1} style="--pct: {pct(P1,30,300)}%" onchange={() => onPressureChange('P1')} />
+            <div class="slider-label"><span>Steam generator outlet P₁</span><span class="slider-value">{P1} MPa</span></div>
+            <input id="r-p1" type="range" min="3" max="30" step="0.1" bind:value={P1} style="--pct: {pct(P1,3,30)}%" onchange={() => onPressureChange('P1')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>Steam generator outlet T₁</span><span class="slider-value">{T1} °C</span></div>
@@ -348,20 +393,20 @@
             <input id="r-t3" type="range" min="480" max="600" step="5" bind:value={T3} onchange={runSolve} />
           </div>
           <div class="slider-row">
-            <div class="slider-label"><span>HP exhaust P₂</span><span class="slider-value">{P2} bar</span></div>
-            <input id="r-p2" type="range" min="30" max="100" step="1" bind:value={P2} style="--pct: {pct(P2,30,100)}%" onchange={() => onPressureChange('P2')} />
+            <div class="slider-label"><span>HP exhaust P₂</span><span class="slider-value">{P2} MPa</span></div>
+            <input id="r-p2" type="range" min="3" max="10" step="0.1" bind:value={P2} style="--pct: {pct(P2,3,10)}%" onchange={() => onPressureChange('P2')} />
           </div>
           <div class="slider-row">
-            <div class="slider-label"><span>IP exhaust P₄</span><span class="slider-value">{P4} bar</span></div>
-            <input id="r-p4" type="range" min="2" max="20" step="0.5" bind:value={P4} style="--pct: {pct(P4,2,20)}%" onchange={() => onPressureChange('P4')} />
+            <div class="slider-label"><span>IP exhaust P₄</span><span class="slider-value">{P4} kPa</span></div>
+            <input id="r-p4" type="range" min="200" max="2000" step="50" bind:value={P4} style="--pct: {pct(P4,200,2000)}%" onchange={() => onPressureChange('P4')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>Reheat ΔP</span><span class="slider-value">{reheat_dP_pct} %</span></div>
             <input id="r-rdp" type="range" min="0" max="8" step="0.5" bind:value={reheat_dP_pct} onchange={runSolve} />
           </div>
           <div class="slider-row">
-            <div class="slider-label"><span>FWH6 shell P (Valve A)</span><span class="slider-value">{P_VA} bar</span></div>
-            <input id="r-pva" type="range" min="60" max="200" step="1" bind:value={P_VA} style="--pct: {pct(P_VA,60,200)}%" onchange={() => onPressureChange('P_VA')} />
+            <div class="slider-label"><span>FWH6 shell P (Valve A)</span><span class="slider-value">{P_VA} MPa</span></div>
+            <input id="r-pva" type="range" min="6" max="20" step="0.1" bind:value={P_VA} style="--pct: {pct(P_VA,6,20)}%" onchange={() => onPressureChange('P_VA')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>Steam generator duty Q</span><span class="slider-value">{Q} MW</span></div>
@@ -382,32 +427,36 @@
         {#if openSections.extraction}
         <div class="slider-body" transition:slide={{ duration: 200 }}>
           <div class="slider-row">
-            <div class="slider-label"><span>P<sub>B</sub> (FWH5 / HP bleed)</span><span class="slider-value">{P_B} bar</span></div>
-            <input id="r-pb" type="range" min="50" max="150" step="1" bind:value={P_B} style="--pct: {pct(P_B,50,150)}%" onchange={() => onPressureChange('P_B')} />
+            <div class="slider-label"><span>P<sub>B</sub> (FWH5 / HP bleed)</span><span class="slider-value">{P_B} MPa</span></div>
+            <input id="r-pb" type="range" min="5" max="15" step="0.1" bind:value={P_B} style="--pct: {pct(P_B,5,15)}%" onchange={() => onPressureChange('P_B')} />
           </div>
           <div class="slider-row">
-            <div class="slider-label"><span>P<sub>C</sub> (FWH4 / IP bleed)</span><span class="slider-value">{P_C} bar</span></div>
-            <input id="r-pc" type="range" min="4" max="15" step="0.1" bind:value={P_C} style="--pct: {pct(P_C,4,15)}%" onchange={() => onPressureChange('P_C')} />
+            <div class="slider-label"><span>P<sub>C</sub> (FWH4 / IP bleed)</span><span class="slider-value">{P_C} kPa</span></div>
+            <input id="r-pc" type="range" min="400" max="1500" step="10" bind:value={P_C} style="--pct: {pct(P_C,400,1500)}%" onchange={() => onPressureChange('P_C')} />
           </div>
           <div class="slider-row">
-            <div class="slider-label"><span>P<sub>D</sub> (Deaerator / IP bleed)</span><span class="slider-value">{P_D} bar</span></div>
-            <input id="r-pd" type="range" min="3" max="12" step="0.1" bind:value={P_D} style="--pct: {pct(P_D,3,12)}%" onchange={() => onPressureChange('P_D')} />
+            <div class="slider-label"><span>P<sub>D</sub> (Deaerator / IP bleed)</span><span class="slider-value">{P_D} kPa</span></div>
+            <input id="r-pd" type="range" min="300" max="1200" step="10" bind:value={P_D} style="--pct: {pct(P_D,300,1200)}%" onchange={() => onPressureChange('P_D')} />
           </div>
           <div class="slider-row">
-            <div class="slider-label"><span>P<sub>E</sub> (FWH3 / LP bleed)</span><span class="slider-value">{P_E} bar</span></div>
-            <input id="r-pe" type="range" min="2" max="8" step="0.1" bind:value={P_E} style="--pct: {pct(P_E,2,8)}%" onchange={() => onPressureChange('P_E')} />
+            <div class="slider-label"><span>P<sub>E</sub> (FWH3 / LP bleed)</span><span class="slider-value">{P_E} kPa</span></div>
+            <input id="r-pe" type="range" min="200" max="800" step="10" bind:value={P_E} style="--pct: {pct(P_E,200,800)}%" onchange={() => onPressureChange('P_E')} />
           </div>
           <div class="slider-row">
-            <div class="slider-label"><span>P<sub>F</sub> (FWH2 / LP bleed)</span><span class="slider-value">{P_F} bar</span></div>
-            <input id="r-pf" type="range" min="1" max="5" step="0.1" bind:value={P_F} style="--pct: {pct(P_F,1,5)}%" onchange={() => onPressureChange('P_F')} />
+            <div class="slider-label"><span>P<sub>F</sub> (FWH2 / LP bleed)</span><span class="slider-value">{P_F} kPa</span></div>
+            <input id="r-pf" type="range" min="100" max="500" step="10" bind:value={P_F} style="--pct: {pct(P_F,100,500)}%" onchange={() => onPressureChange('P_F')} />
           </div>
           <div class="slider-row">
-            <div class="slider-label"><span>P<sub>G</sub> (FWH1 / LP bleed)</span><span class="slider-value">{P_G} bar</span></div>
-            <input id="r-pg" type="range" min="0.5" max="3" step="0.05" bind:value={P_G} style="--pct: {pct(P_G,0.5,3)}%" onchange={() => onPressureChange('P_G')} />
+            <div class="slider-label"><span>P<sub>G</sub> (FWH1 / LP bleed)</span><span class="slider-value">{P_G} kPa</span></div>
+            <input id="r-pg" type="range" min="50" max="300" step="5" bind:value={P_G} style="--pct: {pct(P_G,50,300)}%" onchange={() => onPressureChange('P_G')} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>FWH terminal temp diff (TTD)</span><span class="slider-value">{TTD} °C</span></div>
             <input id="r-ttd" type="range" min="0" max="15" step="0.5" bind:value={TTD} onchange={onTTDChange} />
+          </div>
+          <div class="slider-row">
+            <div class="slider-label"><span>Condensate pump discharge P</span><span class="slider-value">{P_condpump} kPa</span></div>
+            <input id="r-pcondpump" type="range" min="200" max="1300" step="10" bind:value={P_condpump} style="--pct: {pct(P_condpump,200,1300)}%" onchange={onCondPumpChange} />
           </div>
         </div>
         {/if}
@@ -652,8 +701,32 @@
             <p class="readout-value readout-value-amber">{fmt(result.W_net / 1e6, 1)} <span class="readout-unit">MW</span></p>
           </div>
           <div class="readout-card chamfer-panel chamfer-sm">
+            <p class="readout-label">Turbine work</p>
+            <p class="readout-value">{fmt(result.W_turb / 1e6, 1)} <span class="readout-unit">MW</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm">
+            <p class="readout-label">Feedwater pump power</p>
+            <p class="readout-value">{fmt(result.W_fwp / 1e6, 2)} <span class="readout-unit">MW</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm">
+            <p class="readout-label">Condensate pump power</p>
+            <p class="readout-value">{fmt(result.W_condpump / 1e6, 2)} <span class="readout-unit">MW</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm">
+            <p class="readout-label">Circulating pump power</p>
+            <p class="readout-value">{fmt(result.W_cwpump / 1e6, 2)} <span class="readout-unit">MW</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm">
+            <p class="readout-label">Exergy to working fluid</p>
+            <p class="readout-value">{fmt(result.Ex_sg / 1e6, 1)} <span class="readout-unit">MW</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Total steam flow</p>
             <p class="readout-value">{fmt(result.m, 1)} <span class="readout-unit">kg/s</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm">
+            <p class="readout-label">Circulating water flow</p>
+            <p class="readout-value">{fmt(result.mdot_cw, 0)} <span class="readout-unit">kg/s</span></p>
           </div>
           <div class="readout-outer" class:readout-alarm={condWarn}>
             <div class="readout-card chamfer-panel chamfer-sm">
@@ -662,53 +735,55 @@
             </div>
           </div>
           <div class="readout-card chamfer-panel chamfer-sm">
-            <p class="readout-label">Condenser temp</p>
-            <p class="readout-value">{fmt(result.T6C, 2)} <span class="readout-unit">°C</span></p>
-          </div>
-          <div class="readout-card chamfer-panel chamfer-sm">
-            <p class="readout-label">Wet-bulb temp</p>
-            <p class="readout-value">{fmt(result.T_wb, 2)} <span class="readout-unit">°C</span></p>
-          </div>
-          <div class="readout-card chamfer-panel chamfer-sm">
-            <p class="readout-label">CW in → out</p>
-            <p class="readout-value">{fmt(result.T_cw_in, 1)}→{fmt(result.T_cw_out, 1)} <span class="readout-unit">°C</span></p>
-          </div>
-          <div class="readout-card chamfer-panel chamfer-sm">
-            <p class="readout-label">Condenser range</p>
-            <p class="readout-value">{fmt(result.cond_range, 2)} <span class="readout-unit">°C</span></p>
-          </div>
-          <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Condenser TTD</p>
             <p class="readout-value">{fmt(result.cond_TTD_eff, 2)} <span class="readout-unit">°C</span></p>
           </div>
           <div class="readout-card chamfer-panel chamfer-sm">
-            <p class="readout-label">Circulating water flow</p>
-            <p class="readout-value">{fmt(result.mdot_cw, 0)} <span class="readout-unit">kg/s</span></p>
+            <p class="readout-label">Hotwell temperature</p>
+            <p class="readout-value">{fmt(result.T6C, 2)} <span class="readout-unit">°C</span></p>
           </div>
           <div class="readout-card chamfer-panel chamfer-sm">
-            <p class="readout-label">Turbine work</p>
-            <p class="readout-value">{fmt(result.W_turb / 1e6, 1)} <span class="readout-unit">MW</span></p>
-          </div>
-          <div class="readout-card chamfer-panel chamfer-sm">
-            <p class="readout-label">Exergy to working fluid</p>
-            <p class="readout-value">{fmt(result.Ex_sg / 1e6, 1)} <span class="readout-unit">MW</span></p>
-          </div>
-          <div class="readout-card chamfer-panel chamfer-sm">
-            <p class="readout-label">Heat rejected (condenser)</p>
-            <p class="readout-value">{fmt(result.Q_cond / 1e6, 1)} <span class="readout-unit">MW</span></p>
+            <p class="readout-label">Cooling tower basin temp</p>
+            <p class="readout-value">{fmt(result.T_cw_in, 2)} <span class="readout-unit">°C</span></p>
           </div>
         </div>
 
-        <div class="extraction-wrap chamfer-panel">
-          <p class="group-label" style="margin-bottom:5px">Extraction fractions</p>
-          <table class="extraction-table">
-            <thead><tr><th>Bleed</th><th>kg/s</th><th>% of ṁ</th></tr></thead>
+        <div class="state-wrap chamfer-panel">
+          <p class="group-label" style="margin-bottom:5px">Cycle state table</p>
+          <table class="state-table">
+            <thead><tr><th>State</th><th>T (°C)</th><th>P</th><th>h (kJ/kg)</th><th>s (kJ/kg·K)</th><th>ṁ (kg/s)</th></tr></thead>
             <tbody>
-              {#each ['a','b','c','d','e','f','g'] as key}
+              {#each result.stateTable as st}
                 <tr>
-                  <td class="bleed-key">{key}</td>
-                  <td>{fmt(result[key], 2)}</td>
-                  <td>{fmt(100 * result[key] / result.m, 2)}</td>
+                  <td class="state-key">{st.name}</td>
+                  <td>{fmt(st.T, 1)}</td>
+                  <td>{st.P >= 1 ? `${fmt(st.P, 2)} MPa` : `${fmt(st.P * 1000, 0)} kPa`}</td>
+                  <td>{fmt(st.h, 1)}</td>
+                  <td>{fmt(st.s, 4)}</td>
+                  <td>{fmt(st.flow, 2)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="state-wrap chamfer-panel">
+          <p class="group-label" style="margin-bottom:5px">Extraction &amp; drain state table</p>
+          <p class="selection-hint" style="margin-bottom:8px">
+            X1 (amber) = extraction steam entering an FWH shell · X2/X3 (blue) = shell drain / after its
+            booster pump or valve. See the state-visibility panel above to toggle these on the diagram.
+          </p>
+          <table class="state-table">
+            <thead><tr><th>State</th><th>T (°C)</th><th>P</th><th>h (kJ/kg)</th><th>s (kJ/kg·K)</th><th>ṁ (kg/s)</th></tr></thead>
+            <tbody>
+              {#each result.extractionTable as st}
+                <tr>
+                  <td class="state-key" class:state-key-drain={!st.name.endsWith('1')}>{st.name}</td>
+                  <td>{fmt(st.T, 1)}</td>
+                  <td>{st.P >= 1 ? `${fmt(st.P, 2)} MPa` : `${fmt(st.P * 1000, 0)} kPa`}</td>
+                  <td>{fmt(st.h, 1)}</td>
+                  <td>{fmt(st.s, 4)}</td>
+                  <td>{fmt(st.flow, 2)}</td>
                 </tr>
               {/each}
             </tbody>
@@ -729,6 +804,47 @@
     font-family: var(--font-display);
   }
   @media (max-width: 800px) { .rankine-wrap { grid-template-columns: 1fr; } }
+
+  /* Independent scroll panes: each column pins to the viewport top and scrolls
+     internally from there, so paging through sliders never carries the T-s
+     diagram/readouts out of view, and vice versa. A colored scrollbar per
+     column (amber left, teal right - matching each side's own accent) plus a
+     vertical seam down the gap are the visual tell that these are two
+     separate scroll regions, not one long page. Both drop back to normal
+     single-column page flow below the breakpoint, where two independent
+     scroll regions would just fight the page's own scroll. */
+  .controls-col, .diagram-col {
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+  }
+  .controls-col {
+    padding-right: 14px;
+    border-right: 1px solid rgba(0, 0, 0, 0.14);
+    scrollbar-color: #c07a10 transparent;
+  }
+  .diagram-col { scrollbar-color: var(--teal-dim) transparent; }
+  .controls-col::-webkit-scrollbar, .diagram-col::-webkit-scrollbar { width: 8px; }
+  .controls-col::-webkit-scrollbar-track, .diagram-col::-webkit-scrollbar-track { background: transparent; }
+  .controls-col::-webkit-scrollbar-thumb {
+    background-color: #c07a10;
+    border-radius: 5px;
+  }
+  .diagram-col::-webkit-scrollbar-thumb {
+    background-color: var(--teal-dim);
+    border-radius: 5px;
+  }
+  @media (max-width: 800px) {
+    .controls-col, .diagram-col {
+      position: static;
+      max-height: none;
+      overflow: visible;
+    }
+    .controls-col { padding-right: 0; border-right: none; }
+  }
 
   /* Loading / error */
   .loading-state {
@@ -880,25 +996,25 @@
     50%      { box-shadow: 0 0 26px 8px rgba(255, 61, 46, 1), 0 0 0 6px rgba(255, 61, 46, 0.18); }
   }
 
-  /* Extraction table */
-  .extraction-wrap { margin-bottom: 12px; padding: 12px 14px; }
-  .extraction-table {
+  /* State table */
+  .state-wrap { margin-bottom: 12px; padding: 12px 14px; }
+  .state-table {
     width: 100%; border-collapse: collapse; font-size: 13px; color: var(--paper);
   }
-  .extraction-table th {
+  .state-table th {
     font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
     text-transform: uppercase; color: var(--ink-dim);
     text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--steel-900);
   }
-  .extraction-table td {
+  .state-table td {
     font-family: var(--font-mono);
     padding: 4px 8px 4px 0; font-variant-numeric: tabular-nums;
     border-bottom: 1px solid var(--steel-800); color: var(--ink);
   }
-  .bleed-key { font-weight: 700; color: var(--amber-dim); }
+  .state-key { font-weight: 700; color: var(--amber-dim); }
+  .state-key-drain { color: var(--blue); }
 
   /* Diagram */
-  .diagram-col { position: sticky; top: 16px; }
   .diagram-title {
     font-size: 12px; font-weight: 700; color: var(--ink-dim);
     text-transform: uppercase; letter-spacing: 0.07em; margin: 0 0 8px;

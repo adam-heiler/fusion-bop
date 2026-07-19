@@ -1,11 +1,11 @@
-// Promise-based facade over rankineSolver.worker.js.
+// Promise-based facade over co2BraytonSolver.worker.js.
 let worker = null;
 let nextId = 1;
 const pending = new Map();
 
 function getWorker() {
   if (!worker) {
-    worker = new Worker(new URL('./rankineSolver.worker.js', import.meta.url), { type: 'module' });
+    worker = new Worker(new URL('./co2BraytonSolver.worker.js', import.meta.url), { type: 'module' });
     worker.onmessage = (e) => {
       const { id, error } = e.data;
       const p = pending.get(id);
@@ -26,23 +26,11 @@ function call(type, payload) {
   });
 }
 
-export async function initSolver() {
+export async function initCO2Solver() {
   const res = await call('init', {});
   return res.dome;
 }
-export async function solveCycleAsync(params) {
+export async function solveCO2Async(params) {
   const res = await call('solve', { params });
   return res.result;
-}
-export async function minPCAsync(P_D, TTD, eta_pump) {
-  const res = await call('minPC', { P_D, TTD, eta_pump });
-  return res.value;
-}
-export async function minPGAsync(T6C_est, TTD, eta_pump, Pcond) {
-  const res = await call('minPG', { T6C_est, TTD, eta_pump, Pcond });
-  return res.value;
-}
-export async function maxPEAsync(TTD, Pcond) {
-  const res = await call('maxPE', { TTD, Pcond });
-  return res.value;
 }
