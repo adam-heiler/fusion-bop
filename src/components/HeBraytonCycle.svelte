@@ -519,9 +519,8 @@
   @media (max-width: 800px) { .brayton-wrap { grid-template-columns: 1fr; } }
 
   /* Independent scroll panes - see RankineCycle.svelte / CO2BraytonCycle.svelte
-     for the full rationale. Colored scrollbar per column (amber left, teal
-     right) plus a vertical seam down the gap are the visual tell that these
-     are two separate scroll regions, not one long page. */
+     for the full rationale. A vertical seam down the gap is the visual tell
+     that these are two separate scroll regions, not one long page. */
   .controls-col, .diagram-col {
     position: sticky;
     top: 16px;
@@ -529,21 +528,17 @@
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-width: thin;
+    scrollbar-color: var(--steel-700) transparent;
+    scrollbar-gutter: stable;
   }
   .controls-col {
     padding-right: 14px;
     border-right: 1px solid rgba(0, 0, 0, 0.14);
-    scrollbar-color: #c07a10 transparent;
   }
-  .diagram-col { scrollbar-color: var(--teal-dim) transparent; }
   .controls-col::-webkit-scrollbar, .diagram-col::-webkit-scrollbar { width: 8px; }
   .controls-col::-webkit-scrollbar-track, .diagram-col::-webkit-scrollbar-track { background: transparent; }
-  .controls-col::-webkit-scrollbar-thumb {
-    background-color: #c07a10;
-    border-radius: 5px;
-  }
-  .diagram-col::-webkit-scrollbar-thumb {
-    background-color: var(--teal-dim);
+  .controls-col::-webkit-scrollbar-thumb, .diagram-col::-webkit-scrollbar-thumb {
+    background-color: var(--steel-700);
     border-radius: 5px;
   }
   @media (max-width: 800px) {
@@ -614,7 +609,7 @@
   .details-summary::before {
     content: '';
     display: inline-block;
-    width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0;
+    width: 9px; height: 9px; border-radius: 0; flex-shrink: 0; align-self: center;
     background: #9a9d9a;
     box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.15);
     margin-right: 8px;

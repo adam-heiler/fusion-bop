@@ -4,11 +4,6 @@ import CO2BraytonCycle from '../components/CO2BraytonCycle.svelte';
 ---
 <BaseLayout title="CO2 Brayton">
   <div style="max-width: 1700px; margin: 0 auto;">
-    <p class="mb-6" style="color: #8b948c; font-size: 14px;">
-      Supercritical CO<sub>2</sub> recompression Brayton cycle with reheat: main and auxiliary
-      compressors, high-/low-temperature regenerators, cooling-tower precooler.
-      Secondary HTX duty Q = 645 MW default (solar salt from the tokamak intermediate loop).
-    </p>
     <div class="drafting-mat chamfer-panel chamfer-all" style="max-width: 1144px; margin: 0 auto 28px;">
       <div class="drafting-panel">
         <span class="drafting-frame"></span>
@@ -32,6 +27,6 @@ import CO2BraytonCycle from '../components/CO2BraytonCycle.svelte';
     </div>
   </div>
   <div style="max-width: 1100px; margin: 0 auto;">
-    <CO2BraytonCycle client:only="svelte" />
+    <CO2BraytonCycle client:load />
   </div>
 </BaseLayout>

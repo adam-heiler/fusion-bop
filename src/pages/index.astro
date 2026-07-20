@@ -1,7 +1,181 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+
+const cycles = [
+  { href: '/rankine', name: 'H₂O Rankine', img: '/diagrams/fusion-rankine.png', alt: 'H2O Rankine cycle diagram' },
+  { href: '/co2-brayton', name: 'CO₂ Brayton', img: '/diagrams/fusion-co2-brayton.png', alt: 'CO2 Brayton cycle diagram' },
+  { href: '/he-brayton', name: 'He Brayton', img: '/diagrams/fusion-he-brayton.png', alt: 'He Brayton cycle diagram' },
+];
 ---
 <BaseLayout title="Overview">
-  <h1 class="text-3xl font-bold">Fusion BOP</h1>
-  <p>Overview content goes here.</p>
+  <div style="max-width: 1700px; margin: 0 auto;">
+    <div class="welcome-banner chamfer-panel chamfer-all">
+      <div class="welcome-header">
+        <span class="welcome-text">Welcome to <span class="welcome-fusion">Fusion</span><span class="welcome-bop">BoP</span></span>
+        <img src="/logo.png" alt="" class="welcome-mark" />
+      </div>
+      <div class="welcome-body">
+        <img src="/other_images/HI-RES-tokamak-powerline.png" alt="Tokamak plasma cross-section and power transmission line" class="welcome-tokamak" />
+      </div>
+    </div>
+    <div class="drafting-mat chamfer-panel chamfer-all">
+      <div class="drafting-panel overview-panel">
+        <span class="drafting-frame"></span>
+        <span class="drafting-corner tl"></span>
+        <span class="drafting-corner tr"></span>
+        <span class="drafting-corner bl"></span>
+        <span class="drafting-corner br"></span>
+
+        <div class="bop-block">
+          <div class="bop-rows">
+            <div class="bop-row"><span class="bop-letter">B</span><span class="bop-word">alance</span></div>
+            <div class="bop-row"><span class="bop-letter">O</span><span class="bop-word">f</span></div>
+            <div class="bop-row"><span class="bop-letter">P</span><span class="bop-word">lant</span></div>
+          </div>
+        </div>
+
+        <div class="overview-divider"></div>
+
+        <div class="cycles-row">
+          {cycles.map(c => (
+            <a href={c.href} class="cycle-card">
+              <img src={c.img} alt={c.alt} />
+              <span class="cycle-name">{c.name}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
 </BaseLayout>
+
+<style>
+  .welcome-banner {
+    position: relative;
+    padding: 28px 40px 36px;
+    margin-bottom: 24px;
+  }
+  .welcome-header {
+    position: absolute;
+    left: 50%;
+    top: 35px;
+    transform: translateX(-50%);
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+  }
+  .welcome-mark {
+    height: 52px;
+    width: auto;
+  }
+  .welcome-text {
+    font-family: var(--font-display);
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--paper);
+  }
+  .welcome-fusion, .welcome-bop {
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .welcome-fusion { color: var(--paper); }
+  .welcome-bop { color: var(--teal-dim); }
+
+  .welcome-body {
+    display: flex;
+    justify-content: center;
+  }
+  .welcome-tokamak {
+    width: 100%;
+    max-width: 1400px;
+    height: auto;
+  }
+  @media (max-width: 700px) {
+    .welcome-tokamak { max-width: 100%; }
+  }
+
+  .overview-panel {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+
+  .bop-block {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 260px;
+    flex-shrink: 0;
+  }
+  .bop-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .bop-row {
+    display: flex;
+    align-items: baseline;
+  }
+  .bop-letter {
+    font-family: var(--font-display);
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--teal-dim);
+    line-height: 1;
+  }
+  .bop-word {
+    font-family: var(--font-display);
+    font-size: 30px;
+    font-weight: 700;
+    color: #4a4432;
+  }
+
+  .overview-divider {
+    align-self: stretch;
+    width: 1.5px;
+    background: #b8ad91;
+  }
+
+  .cycles-row {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    flex: 1;
+    min-width: 0;
+  }
+  .cycle-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    flex: 1;
+    min-width: 0;
+    transition: transform 0.15s ease;
+  }
+  .cycle-card:hover { transform: translateY(-2px); }
+  .cycle-card img {
+    width: 100%;
+    height: 190px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(60, 50, 20, 0.1));
+  }
+  .cycle-name {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #4a4432;
+  }
+
+  @media (max-width: 900px) {
+    .overview-panel { flex-direction: column; align-items: stretch; }
+    .overview-divider { width: auto; height: 1.5px; }
+    .cycles-row { flex-direction: column; }
+    .cycle-card { width: 100%; }
+  }
+</style>

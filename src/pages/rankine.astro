@@ -4,10 +4,6 @@ import RankineCycle from '../components/RankineCycle.svelte';
 ---
 <BaseLayout title="H2O Rankine">
   <div style="max-width: 1700px; margin: 0 auto;">
-    <p class="mb-6" style="color: #8b948c; font-size: 14px;">
-      250 bar supercritical reheat regenerative cycle: 6 closed feedwater heaters,
-      deaerator, 7 extraction bleeds, cooling-tower condenser. Heat duty Q = 1000 MW fixed.
-    </p>
     <div class="drafting-mat chamfer-panel chamfer-all">
       <div class="drafting-panel">
         <span class="drafting-frame"></span>
@@ -31,6 +27,6 @@ import RankineCycle from '../components/RankineCycle.svelte';
     </div>
   </div>
   <div style="max-width: 1100px; margin: 0 auto;">
-    <RankineCycle client:only="svelte" />
+    <RankineCycle client:load />
   </div>
 </BaseLayout>

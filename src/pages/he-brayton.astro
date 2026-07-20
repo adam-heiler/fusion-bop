@@ -4,11 +4,6 @@ import HeBraytonCycle from '../components/HeBraytonCycle.svelte';
 ---
 <BaseLayout title="He Brayton">
   <div style="max-width: 1700px; margin: 0 auto;">
-    <p class="mb-6" style="color: #8b948c; font-size: 14px;">
-      Supercritical helium Brayton cycle: single turbine, regenerator, and two-stage
-      intercooled compression with a cooling-tower precooler and intercooler.
-      Secondary HTX duty Q = 645 MW default (solar salt from the tokamak intermediate loop).
-    </p>
     <div class="drafting-mat chamfer-panel chamfer-all" style="max-width: 1153px; margin: 0 auto 28px;">
       <div class="drafting-panel">
         <span class="drafting-frame"></span>
@@ -32,6 +27,6 @@ import HeBraytonCycle from '../components/HeBraytonCycle.svelte';
     </div>
   </div>
   <div style="max-width: 1100px; margin: 0 auto;">
-    <HeBraytonCycle client:only="svelte" />
+    <HeBraytonCycle client:load />
   </div>
 </BaseLayout>
