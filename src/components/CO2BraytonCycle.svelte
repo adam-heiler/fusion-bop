@@ -663,8 +663,11 @@
 
   .cond-helper {
     font-family: var(--font-mono);
-    font-size: 11px; font-weight: 700; color: var(--blue); line-height: 1.4; margin: 8px 0 0;
-    padding: 7px 9px; background: rgba(111, 178, 238, 0.07); border: 1px solid rgba(111, 178, 238, 0.25); border-radius: 3px;
+    font-size: 11px; font-weight: 700; line-height: 1.4; margin: 8px 0 0;
+    padding: 7px 9px; border-radius: 3px;
+    color: color-mix(in srgb, var(--slider-color, var(--blue)) 45%, black);
+    background: color-mix(in srgb, var(--slider-color, var(--blue)) 7%, transparent);
+    border: 1px solid color-mix(in srgb, var(--slider-color, var(--blue)) 25%, transparent);
   }
 
   .group-label {

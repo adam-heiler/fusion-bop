@@ -39,6 +39,8 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
           <a href="/co2-brayton" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/co2-brayton') ? 'page' : undefined}><span>CO<sub>2</sub>&nbsp;Brayton</span></a>
           <a href="/he-brayton" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/he-brayton') ? 'page' : undefined}><span>He Brayton</span></a>
         </div>
+
+        <span class="updated-badge">Updated August 2026</span>
       </div>
     </nav>
     <div class="nav-scrim" id="nav-scrim" transition:persist="nav-scrim"></div>
@@ -172,7 +174,7 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
      cover on this tiny box) rendered its grain at a totally different scale than the nav
      behind it. Just tinting with a transparent gradient lets the nav's own texture show
      through underneath at the correct, already-matching scale. */
-  .beta-badge {
+  .beta-badge, .updated-badge {
     display: inline-flex;
     align-items: center;
     font-family: var(--font-mono);
@@ -187,11 +189,15 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
     border-radius: 999px;
     /* Right padding trimmed by the letter-spacing value: letter-spacing adds a trailing
        gap after the last character that isn't part of any glyph, so equal left/right
-       padding leaves "BETA" looking shifted left in the pill. */
+       padding leaves the text looking shifted left in the pill. */
     padding: 0.2rem calc(0.6rem - 0.1em) 0.2rem 0.6rem;
-    margin-right: 0.9rem;
     white-space: nowrap;
     box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.45), inset 0 -1px 0 rgba(255, 255, 255, 0.4);
+  }
+  .beta-badge { margin-right: 0.9rem; }
+  .updated-badge { margin-left: auto; }
+  @media (max-width: 1279px) {
+    .updated-badge { display: none; }
   }
 
   .site-nav .nav-links {

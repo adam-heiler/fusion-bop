@@ -52,12 +52,11 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     position: relative;
     overflow: hidden;
     margin: -24px calc(-50vw + 50%) 0;
-    padding: 28px max(24px, calc(50vw - 640px));
+    padding: 44px max(24px, calc(50vw - 640px));
     background-image:
       linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 42%),
-      linear-gradient(163deg, var(--steel-500), var(--steel-700) 80%),
-      var(--aluminum);
-    background-blend-mode: normal, overlay, normal;
+      linear-gradient(163deg, var(--steel-300), var(--steel-600) 85%);
+    background-blend-mode: normal;
     background-size: cover;
     background-position: center;
     border-bottom: 1px solid var(--hairline);
@@ -68,13 +67,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
+    gap: 12px;
+    margin-bottom: 12px;
   }
-  .hero-logo-mark { height: 40px; width: auto; }
+  .hero-logo-mark { height: 44px; width: auto; }
   .hero-heading-text {
     font-family: var(--font-display);
-    font-size: clamp(22px, 3.4vw, 40px);
+    font-size: clamp(24px, 3.8vw, 46px);
     font-weight: 700;
     color: var(--paper);
     white-space: nowrap;
@@ -110,7 +109,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
      below so both flash the identical color. */
   @keyframes bop-letter-glow {
     0%, 12%, 100% { color: var(--teal-dim); text-shadow: none; }
-    6% { color: #ffffff; text-shadow: 0 0 12px var(--teal-dim), 0 0 7px var(--teal), 0 0 3px var(--teal-dim); }
+    6% { color: #ffffff; text-shadow: 0 0 4px var(--teal), 0 0 1px rgba(255, 255, 255, 0.9); }
   }
 
   /* Three equal-width regions (side / bop / side) so the BOP node always
@@ -141,12 +140,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
      its right widens the pair so it balances the broad tokamak on the left.
      Both towers bottom-align (align-self) so they stand on a common ground
      line instead of floating at different mid-heights. */
-  /* The source PNG's own canvas isn't a symmetric crop around the tower - the
-     lightning-bolt decorations leave far more empty margin on the left than
-     the right, so centering the image box (or bottom/right-aligning it)
-     centers the wrong thing. Shifted left by the tower's actual offset from
-     the canvas's horizontal center (measured directly from the asset) so the
-     drawn tower - not the image's bounding box - lands on center. */
   .hero-art-powerline { height: clamp(200px, 27vw, 400px); align-self: flex-end; transform: translateX(-6.77%); }
   /* Second tower: shorter, tucked in close (negative margin overlaps the art's
      transparent padding), and lifted off the ground line a touch so its base
@@ -193,7 +186,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     flex-shrink: 0;
     --cf: 14px;
     width: calc(clamp(160px, 18vw, 260px) + 6px);
-    height: calc(clamp(120px, 12vw, 180px) + 6px);
     margin: 0 6px;
     padding: 3px;
     clip-path: polygon(
@@ -218,8 +210,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     display: flex;
     align-items: center;
     width: 100%;
-    height: 100%;
-    padding: 0 22px;
+    padding: 16px 26px;
   }
   .bop-node-label {
     display: flex;
@@ -235,6 +226,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     text-align: left;
     color: var(--paper);
     line-height: 1.25;
+    white-space: nowrap;
   }
   /* First letter of each line reads as the BOP acronym reveal - larger and
      teal-tinted at rest. Shares the .bop-letter-N delay classes with the
@@ -243,7 +235,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
      "FusionBoP" - the B's together, then the O's, then the P's. */
   .bop-node-letter {
     display: inline-block;
-    font-size: 1.35em;
+    font-size: 1.2em;
+    line-height: 1;
+    vertical-align: baseline;
     color: var(--teal-dim);
     animation-name: bop-node-letter-glow;
     animation-duration: 2.4s;
@@ -254,7 +248,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
      same white-hot color in both places. */
   @keyframes bop-node-letter-glow {
     0%, 12%, 100% { color: var(--teal-dim); text-shadow: none; }
-    6% { color: #ffffff; text-shadow: 0 0 12px var(--teal-dim), 0 0 7px var(--teal), 0 0 3px var(--teal-dim); }
+    6% { color: #ffffff; text-shadow: 0 0 4px var(--teal), 0 0 1px rgba(255, 255, 255, 0.9); }
   }
 
   @media (max-width: 720px) {
@@ -263,10 +257,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     .hero-heading-text { white-space: normal; }
     .hero-logo-mark { height: 30px; }
 
-    /* Column stack: align-items:center replaces the row's align-items:center
-       (which centered the shorter BOP plate against the taller art) with the
-       equivalent for a vertical stack - centering every item on the shared
-       horizontal axis instead. */
     .hero-flow {
       display: flex;
       flex-direction: column;
@@ -276,16 +266,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     .hero-side, .hero-side-left, .hero-side-right {
       display: contents;
     }
-    /* One tower reads cleanly in a narrow column; the second (perspective)
-       tower was only there to widen a horizontal pairing against the tokamak. */
     .hero-art-powerline-2 { display: none; }
-    /* Sized up relative to the BOP plate below - on the desktop row the art
-       already reads larger than the plate, so the stack should keep that
-       same balance rather than the plate dominating a narrow column. */
     .hero-art { height: clamp(210px, 52vw, 300px); }
-    /* align-self:flex-end means "bottom" in the desktop row's cross axis but
-       "right edge" in this column's cross axis - reset to center so the
-       tower doesn't hug the container's right edge. */
     .hero-art-powerline { height: clamp(230px, 58vw, 330px); align-self: center; margin-bottom: 0; }
 
     .flow-pipe {

@@ -77,6 +77,11 @@ h1, h2, h3, h4 {
   margin: 0 auto 32px;
   padding: 32px 36px;
 }
+.simulator-box.chamfer-panel::before {
+  background-image: linear-gradient(165deg, var(--steel-300), var(--steel-600) 75%);
+  background-size: 100% 100%;
+  background-blend-mode: normal;
+}
 @media (max-width: 480px) {
   /* On top of <main>'s own 24px gutter, the full 36px side padding here left
      almost no room for the two-column grids inside (gauges, readout cards),
@@ -123,7 +128,7 @@ h1, h2, h3, h4 {
   position: relative;
   isolation: isolate;
   clip-path: polygon(var(--cf) 0, 100% 0, 100% calc(100% - var(--cf)), calc(100% - var(--cf)) 100%, 0 100%, 0 var(--cf));
-  background: linear-gradient(152deg, var(--steel-500), var(--steel-800) 60%);
+  background: var(--steel-900);
   box-shadow: 0 6px 14px rgba(30, 34, 38, 0.16), 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 .chamfer-panel::before {

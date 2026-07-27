@@ -119,7 +119,7 @@
     <p class="panel-title">Temperature&ndash;Entropy Diagram</p>
     <div class="diagram-panel chamfer-panel chamfer-all">
     <svg
-      viewBox="0 0 320 250"
+      viewBox="0 0 320 230"
       class="ts-svg"
       role="img"
       aria-label="Temperature-entropy diagram of the Carnot cycle, a rectangle whose corners move as reservoir temperatures change"
