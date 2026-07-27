@@ -348,7 +348,7 @@
 
 <div class="page-header">
   <h1 class="page-title">
-    <span class="title-super" class:struck={!isSupercritical}>Supercritical</span> H<sub>2</sub>O Rankine Cycle
+    <span class="title-super" class:struck={!isSupercritical}>Supercritical</span> H<sub>2</sub>O Rankine Cycle Simulator
   </h1>
   <button type="button" class="reset-btn chamfer-panel chamfer-sm" onclick={resetAll} title="Restore every slider to its default value">
     <span>Reset cycle</span>
@@ -992,7 +992,7 @@
   }
 
   /* State table */
-  .state-wrap { margin-bottom: 12px; padding: 12px 14px; }
+  .state-wrap { margin-bottom: 12px; padding: 12px 14px; overflow-x: auto; }
   .state-table {
     width: 100%; border-collapse: collapse; font-size: 13px; color: var(--paper);
   }

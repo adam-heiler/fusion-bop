@@ -50,6 +50,55 @@ h1, h2, h3, h4 {
   letter-spacing: 0.01em;
 }
 
+/* Standard content width for ordinary page content, so a page's own titles/
+   text sit flush with the same left edge the interactive simulators already
+   use (their wrapper matches this width). Full-bleed elements like the nav
+   or the overview page's banners intentionally don't use this. */
+.page-container {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* Wider breakout for content that benefits from more room than the standard
+   column - process diagrams, hero banners. Still centered and still capped,
+   so it never truly goes edge-to-edge on huge monitors. */
+.page-breakout {
+  max-width: 1760px;
+  margin: 0 auto;
+}
+
+/* Boxes each interactive simulator (its own title + controls + diagram +
+   readouts) in its own chamfered steel panel - it's narrower than the
+   standard page column (matches the sliders' own tuned width), so without a
+   boundary of its own it just read as a stray, oddly-narrow column instead
+   of a deliberate module. Combine with chamfer-panel chamfer-all. */
+.simulator-box {
+  max-width: 1100px;
+  margin: 0 auto 32px;
+  padding: 32px 36px;
+}
+@media (max-width: 480px) {
+  /* On top of <main>'s own 24px gutter, the full 36px side padding here left
+     almost no room for the two-column grids inside (gauges, readout cards),
+     forcing them to overflow the viewport. */
+  .simulator-box {
+    padding: 20px 14px;
+  }
+}
+
+/* Process-flow diagrams (rankine/co2-brayton/he-brayton pages): each page
+   sets its own max-width (a fixed fraction of that image's native pixel
+   resolution) so equipment icons and labels render at the same on-screen
+   size everywhere, rather than every diagram being force-fit to one shared
+   container width regardless of how much detail it actually contains. */
+.cycle-diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 auto 28px;
+  filter: drop-shadow(0 4px 10px rgba(20, 24, 26, 0.12));
+}
+
 /* Shared section-title look (RankineCycle.svelte's scoped .page-title
    mirrors this - kept in sync by hand since Svelte scoping means the two
    can't share one rule). */

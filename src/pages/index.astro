@@ -1,181 +1,302 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-
-const cycles = [
-  { href: '/rankine', name: 'H₂O Rankine', img: '/diagrams/fusion-rankine.png', alt: 'H2O Rankine cycle diagram' },
-  { href: '/co2-brayton', name: 'CO₂ Brayton', img: '/diagrams/fusion-co2-brayton.png', alt: 'CO2 Brayton cycle diagram' },
-  { href: '/he-brayton', name: 'He Brayton', img: '/diagrams/fusion-he-brayton.png', alt: 'He Brayton cycle diagram' },
-];
 ---
 <BaseLayout title="Overview">
-  <div style="max-width: 1700px; margin: 0 auto;">
-    <div class="welcome-banner chamfer-panel chamfer-all">
-      <div class="welcome-header">
-        <span class="welcome-text">Welcome to <span class="welcome-fusion">Fusion</span><span class="welcome-bop">BoP</span></span>
-        <img src="/logo.png" alt="" class="welcome-mark" />
-      </div>
-      <div class="welcome-body">
-        <img src="/other_images/HI-RES-tokamak-powerline.png" alt="Tokamak plasma cross-section and power transmission line" class="welcome-tokamak" />
-      </div>
+  <section class="hero">
+    <div class="hero-heading">
+      <span class="hero-heading-text">Welcome to <span class="hero-fusion">Fusion</span><span class="hero-bop"><span class="bop-letter bop-letter-1">B</span><span class="bop-letter bop-letter-2">o</span><span class="bop-letter bop-letter-3">P</span></span></span>
+      <img src="/logo.png" alt="" class="hero-logo-mark" />
     </div>
-    <div class="drafting-mat chamfer-panel chamfer-all">
-      <div class="drafting-panel overview-panel">
-        <span class="drafting-frame"></span>
-        <span class="drafting-corner tl"></span>
-        <span class="drafting-corner tr"></span>
-        <span class="drafting-corner bl"></span>
-        <span class="drafting-corner br"></span>
 
-        <div class="bop-block">
-          <div class="bop-rows">
-            <div class="bop-row"><span class="bop-letter">B</span><span class="bop-word">alance</span></div>
-            <div class="bop-row"><span class="bop-letter">O</span><span class="bop-word">f</span></div>
-            <div class="bop-row"><span class="bop-letter">P</span><span class="bop-word">lant</span></div>
-          </div>
-        </div>
+    <div class="hero-flow">
+      <div class="hero-side hero-side-left">
+        <img src="/other_images/hires-tokamak.png" alt="Tokamak plasma cross-section" class="hero-art" width="2500" height="2074" />
+        <div class="flow-pipe"></div>
+      </div>
 
-        <div class="overview-divider"></div>
-
-        <div class="cycles-row">
-          {cycles.map(c => (
-            <a href={c.href} class="cycle-card">
-              <img src={c.img} alt={c.alt} />
-              <span class="cycle-name">{c.name}</span>
-            </a>
-          ))}
+      <div class="bop-node-frame">
+        <div class="bop-node-glow"></div>
+        <div class="bop-node chamfer-panel chamfer-all">
+          <span class="bop-node-label">
+            <span class="bop-node-line"><span class="bop-node-letter bop-letter-1">B</span>alance</span>
+            <span class="bop-node-line"><span class="bop-node-letter bop-letter-2">O</span>f</span>
+            <span class="bop-node-line"><span class="bop-node-letter bop-letter-3">P</span>lant</span>
+          </span>
         </div>
       </div>
+
+      <div class="hero-side hero-side-right">
+        <div class="flow-pipe"></div>
+        <img src="/other_images/hires-powerline.png" alt="Power transmission line" class="hero-art hero-art-powerline" width="1935" height="2500" />
+        <img src="/other_images/hires-powerline.png" alt="" class="hero-art hero-art-powerline hero-art-powerline-2" width="1935" height="2500" />
+      </div>
     </div>
-  </div>
+  </section>
 </BaseLayout>
 
 <style>
-  .welcome-banner {
+  /* Full-bleed hero: breaks out of the page's own padding entirely (matches
+     how the nav itself spans edge to edge) - the negative top margin also
+     cancels out <main>'s own top padding so this sits flush against the nav
+     bar with no gap.
+
+     Light brushed metal, the site's standard recipe (compare the nav): the
+     aluminum grain shows through a steel gradient (overlay preserves the
+     grain) with a soft white highlight up top for a lit-from-above sheen.
+
+     overflow: hidden contains the spinning BOP-node glow (an oversized abs-
+     positioned child): clip-path hides its paint but not its layout box, so
+     without this the rotating box grew the page's scroll height and the whole
+     site nudged up and down as it turned. */
+  .hero {
     position: relative;
-    padding: 28px 40px 36px;
-    margin-bottom: 24px;
+    overflow: hidden;
+    margin: -24px calc(-50vw + 50%) 0;
+    padding: 28px max(24px, calc(50vw - 640px));
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 42%),
+      linear-gradient(163deg, var(--steel-500), var(--steel-700) 80%),
+      var(--aluminum);
+    background-blend-mode: normal, overlay, normal;
+    background-size: cover;
+    background-position: center;
+    border-bottom: 1px solid var(--hairline);
   }
-  .welcome-header {
-    position: absolute;
-    left: 50%;
-    top: 35px;
-    transform: translateX(-50%);
-    z-index: 2;
+
+  .hero-heading {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    margin-bottom: 8px;
   }
-  .welcome-mark {
-    height: 52px;
-    width: auto;
-  }
-  .welcome-text {
+  .hero-logo-mark { height: 40px; width: auto; }
+  .hero-heading-text {
     font-family: var(--font-display);
-    font-size: 42px;
+    font-size: clamp(22px, 3.4vw, 40px);
     font-weight: 700;
     color: var(--paper);
+    white-space: nowrap;
   }
-  .welcome-fusion, .welcome-bop {
+  .hero-fusion, .hero-bop {
     letter-spacing: 0.02em;
     text-transform: uppercase;
   }
-  .welcome-fusion { color: var(--paper); }
-  .welcome-bop { color: var(--teal-dim); }
+  .hero-fusion { color: var(--paper); }
 
-  .welcome-body {
-    display: flex;
-    justify-content: center;
+  /* BoP letters take turns lighting up bright teal in sequence, looping.
+     Longhand animation-* properties (not the `animation` shorthand) here and
+     on .bop-node-letter below: the shorthand resets every sub-property it
+     doesn't mention - including animation-delay - back to 0s. Since these
+     two rules and the .bop-letter-N delay rules all match the same elements,
+     whichever one used the shorthand would silently wipe out the staggered
+     delays that make B/O/P line up with their counterparts in "Balance of
+     Plant" below. */
+  .bop-letter {
+    display: inline-block;
+    color: var(--teal-dim);
+    animation-name: bop-letter-glow;
+    animation-duration: 2.4s;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
   }
-  .welcome-tokamak {
-    width: 100%;
-    max-width: 1400px;
-    height: auto;
-  }
-  @media (max-width: 700px) {
-    .welcome-tokamak { max-width: 100%; }
+  .bop-letter-1 { animation-delay: 0s; }
+  .bop-letter-2 { animation-delay: 0.8s; }
+  .bop-letter-3 { animation-delay: 1.6s; }
+  /* Pure white on this light metal would just vanish, so the flash peak is a
+     white-hot core wrapped in a saturated teal glow - reads as the letter
+     lighting up rather than disappearing. Shared verbatim by the box letters
+     below so both flash the identical color. */
+  @keyframes bop-letter-glow {
+    0%, 12%, 100% { color: var(--teal-dim); text-shadow: none; }
+    6% { color: #ffffff; text-shadow: 0 0 12px var(--teal-dim), 0 0 7px var(--teal), 0 0 3px var(--teal-dim); }
   }
 
-  .overview-panel {
+  /* Three equal-width regions (side / bop / side) so the BOP node always
+     sits dead-center under the heading above, regardless of the tokamak
+     and powerline art having different native widths. */
+  .hero-flow {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  .hero-side {
     display: flex;
     align-items: center;
-    gap: 32px;
-    flex-wrap: wrap;
+    min-width: 0;
   }
-
-  .bop-block {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 260px;
+  .hero-side-left { justify-content: flex-end; }
+  .hero-side-right { justify-content: flex-start; }
+  .hero-art {
+    width: auto;
+    height: clamp(160px, 22vw, 320px);
     flex-shrink: 0;
   }
-  .bop-rows {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
-  .bop-row {
-    display: flex;
-    align-items: baseline;
-  }
-  .bop-letter {
-    font-family: var(--font-display);
-    font-size: 42px;
-    font-weight: 700;
-    color: var(--teal-dim);
-    line-height: 1;
-  }
-  .bop-word {
-    font-family: var(--font-display);
-    font-size: 30px;
-    font-weight: 700;
-    color: #4a4432;
-  }
-
-  .overview-divider {
-    align-self: stretch;
-    width: 1.5px;
-    background: #b8ad91;
+  /* The powerline art is a narrow portrait crop, so at the same height as
+     the tokamak it reads as smaller/less prominent - sized up on its own
+     to hold its own visually against the tokamak. A second, shorter tower to
+     its right widens the pair so it balances the broad tokamak on the left.
+     Both towers bottom-align (align-self) so they stand on a common ground
+     line instead of floating at different mid-heights. */
+  /* The source PNG's own canvas isn't a symmetric crop around the tower - the
+     lightning-bolt decorations leave far more empty margin on the left than
+     the right, so centering the image box (or bottom/right-aligning it)
+     centers the wrong thing. Shifted left by the tower's actual offset from
+     the canvas's horizontal center (measured directly from the asset) so the
+     drawn tower - not the image's bounding box - lands on center. */
+  .hero-art-powerline { height: clamp(200px, 27vw, 400px); align-self: flex-end; transform: translateX(-6.77%); }
+  /* Second tower: shorter, tucked in close (negative margin overlaps the art's
+     transparent padding), and lifted off the ground line a touch so its base
+     sits higher than the front tower - reads as a smaller tower set further
+     back in perspective. */
+  .hero-art-powerline-2 {
+    height: clamp(110px, 15vw, 230px);
+    align-self: flex-end;
+    margin-left: clamp(-34px, -2.4vw, -14px);
+    margin-bottom: clamp(16px, 4vw, 54px);
   }
 
-  .cycles-row {
+  /* Power flow: a plain moving dashed line - no glow, just the animation.
+     Fixed width (not flex-grow) so both sides are always the same length
+     regardless of the tokamak and powerline art having different widths. */
+  .flow-pipe {
+    flex: none;
+    width: clamp(50px, 6vw, 110px);
+    height: 3px;
+    margin: 0 4px;
+    background-image: repeating-linear-gradient(90deg, var(--teal) 0 12px, transparent 12px 24px);
+    background-size: 48px 3px;
+    animation: flow-move 1.2s linear infinite;
+  }
+  @keyframes flow-move {
+    to { background-position: 48px 0; }
+  }
+
+  /* BOP node: a light chamfered instrument plate (like the equipment blocks
+     in the process-flow diagrams) rather than dark-on-dark - reads clearly
+     against the dark hero without needing a glow to be legible. A landscape
+     plate (not a square) gives the left-aligned label somewhere to sit
+     instead of just floating centered.
+
+     Border treatment is a light chasing around the chamfered edge, not a
+     static colored line: .bop-node-frame is a couple px larger than the
+     plate and clipped to the identical chamfer shape; a spinning, oversized
+     conic-gradient div sits behind the plate, so only a thin ring of it
+     peeks out around the perimeter - clip-path clips the whole subtree
+     (including this absolutely-positioned, off-box child), so the rotation
+     never escapes the chamfer outline. */
+  .bop-node-frame {
+    position: relative;
+    flex-shrink: 0;
+    --cf: 14px;
+    width: calc(clamp(160px, 18vw, 260px) + 6px);
+    height: calc(clamp(120px, 12vw, 180px) + 6px);
+    margin: 0 6px;
+    padding: 3px;
+    clip-path: polygon(
+      var(--cf) 0, calc(100% - var(--cf)) 0,
+      100% var(--cf), 100% calc(100% - var(--cf)),
+      calc(100% - var(--cf)) 100%, var(--cf) 100%,
+      0 calc(100% - var(--cf)), 0 var(--cf)
+    );
+  }
+  .bop-node-glow {
+    position: absolute;
+    inset: -75%;
+    background: conic-gradient(from 0deg, transparent 0 72%, rgba(53, 214, 180, 0.25) 82%, var(--teal) 94%, transparent 100%);
+    animation: bop-ring-spin 3.2s linear infinite;
+  }
+  @keyframes bop-ring-spin {
+    to { transform: rotate(360deg); }
+  }
+  .bop-node {
+    position: relative;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 28px;
-    flex: 1;
-    min-width: 0;
-  }
-  .cycle-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    flex: 1;
-    min-width: 0;
-    transition: transform 0.15s ease;
-  }
-  .cycle-card:hover { transform: translateY(-2px); }
-  .cycle-card img {
     width: 100%;
-    height: 190px;
-    object-fit: contain;
-    filter: drop-shadow(0 2px 4px rgba(60, 50, 20, 0.1));
+    height: 100%;
+    padding: 0 22px;
   }
-  .cycle-name {
-    font-family: var(--font-mono);
-    font-size: 12.5px;
+  .bop-node-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .bop-node-line {
+    font-family: var(--font-display);
+    font-size: clamp(20px, 2.6vw, 30px);
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
     text-transform: uppercase;
-    color: #4a4432;
+    text-align: left;
+    color: var(--paper);
+    line-height: 1.25;
+  }
+  /* First letter of each line reads as the BOP acronym reveal - larger and
+     teal-tinted at rest. Shares the .bop-letter-N delay classes with the
+     heading above (see the note there on why longhand, not shorthand), so
+     each letter here lights up in the same instant as its counterpart in
+     "FusionBoP" - the B's together, then the O's, then the P's. */
+  .bop-node-letter {
+    display: inline-block;
+    font-size: 1.35em;
+    color: var(--teal-dim);
+    animation-name: bop-node-letter-glow;
+    animation-duration: 2.4s;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+  /* Identical peak to the heading's bop-letter-glow so the acronym flashes the
+     same white-hot color in both places. */
+  @keyframes bop-node-letter-glow {
+    0%, 12%, 100% { color: var(--teal-dim); text-shadow: none; }
+    6% { color: #ffffff; text-shadow: 0 0 12px var(--teal-dim), 0 0 7px var(--teal), 0 0 3px var(--teal-dim); }
   }
 
-  @media (max-width: 900px) {
-    .overview-panel { flex-direction: column; align-items: stretch; }
-    .overview-divider { width: auto; height: 1.5px; }
-    .cycles-row { flex-direction: column; }
-    .cycle-card { width: 100%; }
+  @media (max-width: 720px) {
+    .hero { padding: 32px 20px; }
+    .hero-heading { text-align: center; }
+    .hero-heading-text { white-space: normal; }
+    .hero-logo-mark { height: 30px; }
+
+    /* Column stack: align-items:center replaces the row's align-items:center
+       (which centered the shorter BOP plate against the taller art) with the
+       equivalent for a vertical stack - centering every item on the shared
+       horizontal axis instead. */
+    .hero-flow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+    .hero-side, .hero-side-left, .hero-side-right {
+      display: contents;
+    }
+    /* One tower reads cleanly in a narrow column; the second (perspective)
+       tower was only there to widen a horizontal pairing against the tokamak. */
+    .hero-art-powerline-2 { display: none; }
+    /* Sized up relative to the BOP plate below - on the desktop row the art
+       already reads larger than the plate, so the stack should keep that
+       same balance rather than the plate dominating a narrow column. */
+    .hero-art { height: clamp(210px, 52vw, 300px); }
+    /* align-self:flex-end means "bottom" in the desktop row's cross axis but
+       "right edge" in this column's cross axis - reset to center so the
+       tower doesn't hug the container's right edge. */
+    .hero-art-powerline { height: clamp(230px, 58vw, 330px); align-self: center; margin-bottom: 0; }
+
+    .flow-pipe {
+      width: 3px; height: 28px; flex: none; margin: 0;
+      background-image: repeating-linear-gradient(180deg, var(--teal) 0 12px, transparent 12px 24px);
+      background-size: 3px 48px;
+      animation: flow-move-v 1.2s linear infinite;
+    }
+    @keyframes flow-move-v { to { background-position: 0 48px; } }
+    .bop-node-frame { width: 176px; height: auto; }
+    .bop-node { height: auto; padding: 14px 18px; }
+    .bop-node-line { font-size: 18px; }
   }
 </style>

@@ -24,8 +24,6 @@
 
   // Per-instance id suffix so multiple gauges don't collide over <defs> ids.
   const uid = Math.random().toString(36).slice(2, 9);
-  // Randomized so gauges don't all wiggle in lockstep.
-  const wiggleDelay = -(Math.random() * 1.4).toFixed(2);
 
   const cx = 80, cy = 92, R = 52, BEZEL = R + 14;
 
@@ -138,7 +136,7 @@
     <path d={bezelPath} fill="url(#glass-{uid})" clip-path="url(#clip-{uid})" />
 
     <!-- Needle -->
-    <g class="needle-grp" style="animation-delay: {wiggleDelay}s">
+    <g class="needle-grp">
       <polygon points={needlePoly} fill={accentDim} stroke="#0a0b0d" stroke-width="0.5" />
       <circle cx={cx} cy={cy} r="6.5" fill="url(#hub-{uid})" stroke="#0a0b0d" stroke-width="0.6" />
       <circle cx={cx - 1.3} cy={cy - 1.8} r="1.4" fill="#fff" opacity="0.75" />
@@ -175,16 +173,8 @@
   }
   .lcd-unit { font-size: 11px; opacity: 0.75; margin-left: 1px; }
 
-  /* Idle jiggle; will-change keeps it on its own compositing layer for smoother mobile perf. */
   .needle-grp {
     transform-origin: 80px 92px;
-    animation: needle-jiggle 1.4s ease-in-out infinite;
-    will-change: transform;
-  }
-  @keyframes needle-jiggle {
-    0%, 100% { transform: rotate(0deg); }
-    25%      { transform: rotate(-1.5deg); }
-    75%      { transform: rotate(1.5deg); }
   }
 
   /* .gauge-widget has clip-path (for its chamfered corners), which clips box-shadow too -

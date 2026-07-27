@@ -187,7 +187,7 @@
 </script>
 
 <div class="page-header">
-  <h1 class="page-title">Supercritical He Brayton Cycle</h1>
+  <h1 class="page-title">Supercritical He Brayton Cycle Simulator</h1>
   <button type="button" class="reset-btn chamfer-panel chamfer-sm" onclick={resetAll} title="Restore every slider to its default value">
     <span>Reset cycle</span>
   </button>
@@ -678,7 +678,7 @@
   .readout-unit { font-family: var(--font-display); font-size: 11px; font-weight: 700; color: var(--ink-dim); }
 
   /* State table */
-  .state-wrap { margin-bottom: 12px; padding: 12px 14px; }
+  .state-wrap { margin-bottom: 12px; padding: 12px 14px; overflow-x: auto; }
   .state-table {
     width: 100%; border-collapse: collapse; font-size: 13px; color: var(--paper);
   }

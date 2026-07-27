@@ -180,6 +180,10 @@
   .controls-col,
   .diagram-col {
     font-family: var(--font-display);
+    /* Overrides the grid item default of min-width: auto (content's
+       min-content size) - without it, a wide child can force even a bare
+       1fr track past its container at narrow viewports. */
+    min-width: 0;
   }
 
   .panel-title {

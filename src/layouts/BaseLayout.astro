@@ -23,20 +23,22 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
   </head>
   <body class="min-h-screen">
     <nav class="site-nav" transition:persist="site-nav">
-      <a href="/" class="site-logo"><span class="logo-text">Fusion<span class="logo-bop">BoP</span></span><img src="/logo.png" alt="" class="site-logo-mark" /></a>
-      <span class="beta-badge">Beta</span>
+      <div class="site-nav-inner">
+        <a href="/" class="site-logo"><span class="logo-text">Fusion<span class="logo-bop">BoP</span></span><img src="/logo.png" alt="" class="site-logo-mark" /></a>
+        <span class="beta-badge">Beta</span>
 
-      <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="nav-links">
-        <span></span><span></span><span></span>
-      </button>
+        <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="nav-links">
+          <span></span><span></span><span></span>
+        </button>
 
-      <div class="nav-links" id="nav-links">
-        <a href="/" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/') ? 'page' : undefined}><span>Overview</span></a>
-        <a href="/thermo-background" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/thermo-background') ? 'page' : undefined}><span>Thermodynamics Background</span></a>
-        <a href="/tokamak-systems" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/tokamak-systems') ? 'page' : undefined}><span>Tokamak Systems</span></a>
-        <a href="/rankine" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/rankine') ? 'page' : undefined}><span>H<sub>2</sub>O Rankine</span></a>
-        <a href="/co2-brayton" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/co2-brayton') ? 'page' : undefined}><span>CO<sub>2</sub>&nbsp;Brayton</span></a>
-        <a href="/he-brayton" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/he-brayton') ? 'page' : undefined}><span>He Brayton</span></a>
+        <div class="nav-links" id="nav-links">
+          <a href="/" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/') ? 'page' : undefined}><span>Overview</span></a>
+          <a href="/thermo-background" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/thermo-background') ? 'page' : undefined}><span>Thermodynamics Background</span></a>
+          <a href="/tokamak-systems" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/tokamak-systems') ? 'page' : undefined}><span>Tokamak Systems</span></a>
+          <a href="/rankine" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/rankine') ? 'page' : undefined}><span>H<sub>2</sub>O Rankine</span></a>
+          <a href="/co2-brayton" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/co2-brayton') ? 'page' : undefined}><span>CO<sub>2</sub>&nbsp;Brayton</span></a>
+          <a href="/he-brayton" class="chamfer-panel chamfer-sm" aria-current={isCurrent('/he-brayton') ? 'page' : undefined}><span>He Brayton</span></a>
+        </div>
       </div>
     </nav>
     <div class="nav-scrim" id="nav-scrim" transition:persist="nav-scrim"></div>
@@ -114,9 +116,6 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
 <style is:global>
   .site-nav {
     position: relative;
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
     padding: 0.55rem 1.5rem;
     min-height: 54px;
     background-image:
@@ -129,6 +128,17 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
     background-blend-mode: normal, overlay, normal;
     border-bottom: 1px solid var(--hairline);
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  /* Constrains nav content to the same standard width as .page-container
+     (see global.css) so the logo and page titles/content share one left
+     edge - the bar itself still spans full width for the background. */
+  .site-nav-inner {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    max-width: 1280px;
+    margin: 0 auto;
   }
 
   .site-nav .site-logo {
@@ -179,7 +189,7 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
        gap after the last character that isn't part of any glyph, so equal left/right
        padding leaves "BETA" looking shifted left in the pill. */
     padding: 0.2rem calc(0.6rem - 0.1em) 0.2rem 0.6rem;
-    margin-right: 1.25rem;
+    margin-right: 0.9rem;
     white-space: nowrap;
     box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.45), inset 0 -1px 0 rgba(255, 255, 255, 0.4);
   }
@@ -196,7 +206,7 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
   .site-nav .nav-links a {
     display: inline-flex;
     align-items: center;
-    padding: 0.4rem 0.85rem;
+    padding: 0.4rem 0.7rem;
     font-size: 0.85rem;
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -270,7 +280,11 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
 
   body.nav-lock { overflow: hidden; }
 
-  @media (max-width: 900px) {
+  /* Breakpoint sits just above where the full link row stops fitting on one
+     line (measured ~1090px of actual content) - below it the links move
+     into the slide-in panel instead of wrapping into a broken-looking
+     two-row bar. */
+  @media (max-width: 1140px) {
     .site-nav .nav-links {
       position: fixed;
       top: 0;

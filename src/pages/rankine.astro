@@ -3,30 +3,25 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import RankineCycle from '../components/RankineCycle.svelte';
 ---
 <BaseLayout title="H2O Rankine">
-  <div style="max-width: 1700px; margin: 0 auto;">
-    <div class="drafting-mat chamfer-panel chamfer-all">
-      <div class="drafting-panel">
-        <span class="drafting-frame"></span>
-        <span class="drafting-corner tl"></span>
-        <span class="drafting-corner tr"></span>
-        <span class="drafting-corner bl"></span>
-        <span class="drafting-corner br"></span>
-        <img src="/diagrams/fusion-rankine.png" alt="Process flow diagram of the supercritical reheat regenerative Rankine cycle balance of plant" />
-        <div class="drafting-titleblock">
-          <div class="tb-title">
-            <span class="tb-line1">FUSION BOP</span>
-            <span class="tb-line2">H<sub>2</sub>O RANKINE CYCLE PROCESS FLOW DIAGRAM</span>
-          </div>
-          <div class="tb-meta">
-            <div class="tb-row"><span class="tb-key">DWG NO.</span><span class="tb-val">RANKINE&#8209;01</span></div>
-            <div class="tb-row"><span class="tb-key">REV</span><span class="tb-val">A</span></div>
-            <div class="tb-row"><span class="tb-key">SCALE</span><span class="tb-val">NTS</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
+  <div class="page-container">
+    <h2 class="page-title">H<sub>2</sub>O Rankine Cycle</h2>
   </div>
-  <div style="max-width: 1100px; margin: 0 auto;">
-    <RankineCycle client:load />
+  <div class="page-breakout">
+    <img class="cycle-diagram diagram-rankine" src="/diagrams/fusion-rankine.png" alt="Process flow diagram of the supercritical reheat regenerative Rankine cycle balance of plant" width="2457" height="1052" />
+  </div>
+  <div class="simulator-box chamfer-panel chamfer-all">
+    <!-- Plain div, not RankineCycle directly: Astro's own <astro-island> wrapper
+         is display:contents, so chamfer-panel's ">*" z-index promotion (needed
+         to paint above its own textured ::before) silently no-ops on it. -->
+    <div><RankineCycle client:load /></div>
   </div>
 </BaseLayout>
+
+<style>
+  /* Diagrams are sized off their own native resolution (see NOTES in
+     co2-brayton.astro / he-brayton.astro) rather than all sharing one
+     container width, so equipment icons and labels read at a consistent
+     size across the three cycle pages. Rankine has roughly twice the
+     equipment of the other two, hence the noticeably wider cap. */
+  .diagram-rankine { max-width: 1560px; }
+</style>

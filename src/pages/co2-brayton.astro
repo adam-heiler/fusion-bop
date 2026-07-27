@@ -3,30 +3,25 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import CO2BraytonCycle from '../components/CO2BraytonCycle.svelte';
 ---
 <BaseLayout title="CO2 Brayton">
-  <div style="max-width: 1700px; margin: 0 auto;">
-    <div class="drafting-mat chamfer-panel chamfer-all" style="max-width: 1144px; margin: 0 auto 28px;">
-      <div class="drafting-panel">
-        <span class="drafting-frame"></span>
-        <span class="drafting-corner tl"></span>
-        <span class="drafting-corner tr"></span>
-        <span class="drafting-corner bl"></span>
-        <span class="drafting-corner br"></span>
-        <img src="/diagrams/fusion-co2-brayton.png" alt="Process flow diagram of the supercritical CO2 recompression Brayton cycle balance of plant" />
-        <div class="drafting-titleblock">
-          <div class="tb-title">
-            <span class="tb-line1">FUSION BOP</span>
-            <span class="tb-line2">CO<sub>2</sub> BRAYTON CYCLE PROCESS FLOW DIAGRAM</span>
-          </div>
-          <div class="tb-meta">
-            <div class="tb-row"><span class="tb-key">DWG NO.</span><span class="tb-val">CO2BRAY&#8209;01</span></div>
-            <div class="tb-row"><span class="tb-key">REV</span><span class="tb-val">A</span></div>
-            <div class="tb-row"><span class="tb-key">SCALE</span><span class="tb-val">NTS</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
+  <div class="page-container">
+    <h2 class="page-title">CO<sub>2</sub> Brayton Cycle</h2>
   </div>
-  <div style="max-width: 1100px; margin: 0 auto;">
-    <CO2BraytonCycle client:load />
+  <div class="page-breakout">
+    <img class="cycle-diagram diagram-co2" src="/diagrams/fusion-co2-brayton.png" alt="Process flow diagram of the supercritical CO2 recompression Brayton cycle balance of plant" width="1653" height="800" />
+  </div>
+  <div class="simulator-box chamfer-panel chamfer-all">
+    <!-- Plain div, not CO2BraytonCycle directly: Astro's own <astro-island>
+         wrapper is display:contents, so chamfer-panel's ">*" z-index promotion
+         (needed to paint above its own textured ::before) silently no-ops on it. -->
+    <div><CO2BraytonCycle client:load /></div>
   </div>
 </BaseLayout>
+
+<style>
+  /* Sized off this diagram's own native resolution (1653x800) at the same
+     scale factor as the Rankine and He diagrams (~0.635x native), so
+     equipment icons and text labels read at a consistent size across all
+     three cycle pages instead of each being stretched to fill an identical
+     container regardless of how much native detail it actually has. */
+  .diagram-co2 { max-width: 1050px; }
+</style>

@@ -1,13 +1,23 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import CarnotCycle from '../components/CarnotCycle.svelte';
+import EntropySimulator from '../components/EntropySimulator.svelte';
 ---
 <BaseLayout title="Thermodynamics Background">
   <h1 class="text-3xl font-bold mb-4">Thermodynamics Background</h1>
   <p class="mb-8">Static background content goes here.</p>
 
-  <div style="max-width: 900px; margin: 0 auto;">
+  <div class="simulator-box chamfer-panel chamfer-all" style="max-width: 900px;">
     <h2 class="page-title">The Carnot cycle</h2>
-    <CarnotCycle client:load />
+    <!-- Plain div, not CarnotCycle directly: Astro's own <astro-island>
+         wrapper is display:contents, so chamfer-panel's ">*" z-index promotion
+         (needed to paint above its own textured ::before) silently no-ops on it. -->
+    <div><CarnotCycle client:load /></div>
+  </div>
+
+  <div class="simulator-box chamfer-panel chamfer-all" style="max-width: 980px;">
+    <h2 class="page-title">Entropy Simulator</h2>
+    <!-- Plain div wrapper: see the Carnot box above for the astro-island reason. -->
+    <div><EntropySimulator client:load /></div>
   </div>
 </BaseLayout>
