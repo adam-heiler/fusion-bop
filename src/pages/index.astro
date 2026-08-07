@@ -54,6 +54,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     margin: -24px calc(-50vw + 50%) 0;
     padding: 44px max(24px, calc(50vw - 640px));
     background-image:
+      linear-gradient(0deg, rgba(53, 214, 180, 0.2), rgba(53, 214, 180, 0) 40%),
       linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 42%),
       linear-gradient(163deg, var(--steel-300), var(--steel-600) 85%);
     background-blend-mode: normal;
@@ -254,8 +255,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   @media (max-width: 720px) {
     .hero { padding: 32px 20px; }
     .hero-heading { text-align: center; }
-    .hero-heading-text { white-space: normal; }
-    .hero-logo-mark { height: 30px; }
+    .hero-heading-text { white-space: normal; font-size: clamp(28px, 7.5vw, 46px); }
+    .hero-logo-mark { height: 34px; }
 
     .hero-flow {
       display: flex;
@@ -277,8 +278,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       animation: flow-move-v 1.2s linear infinite;
     }
     @keyframes flow-move-v { to { background-position: 0 48px; } }
-    .bop-node-frame { width: 176px; height: auto; }
-    .bop-node { height: auto; padding: 14px 18px; }
-    .bop-node-line { font-size: 18px; }
+    .bop-node-frame { width: 220px; height: auto; }
+    .bop-node { height: auto; padding: 18px 22px; }
+    .bop-node-line { font-size: 22px; }
   }
 </style>
