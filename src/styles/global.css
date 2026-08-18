@@ -103,6 +103,20 @@ h1, h2, h3, h4 {
   margin: 0 auto 28px;
   filter: drop-shadow(0 4px 10px rgba(20, 24, 26, 0.12));
 }
+@media (max-width: 720px) {
+  /* These diagrams are dense - equipment icons and text labels baked into
+     the image - so shrinking to the viewport's full width like everything
+     else made all of that unreadably tiny. A legible floor width instead,
+     with the wrapper scrolling horizontally below that. */
+  .page-breakout {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cycle-diagram {
+    width: auto;
+    min-width: 640px;
+  }
+}
 
 /* Shared section-title look (RankineCycle.svelte's scoped .page-title
    mirrors this - kept in sync by hand since Svelte scoping means the two

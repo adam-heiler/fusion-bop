@@ -1053,15 +1053,15 @@
   }
   .ex-checks { display: flex; flex-direction: column; gap: 4px; flex: 1; }
   .sel-item {
-    display: flex; align-items: flex-start; gap: 6px;
+    display: flex; align-items: center; gap: 6px;
     cursor: pointer; font-size: 12px; font-weight: 700; color: var(--ink); line-height: 1.35;
   }
   .sel-item input[type="checkbox"] {
-    margin-top: 2px; accent-color: var(--blue); flex-shrink: 0; cursor: pointer;
+    accent-color: var(--blue); flex-shrink: 0; cursor: pointer;
   }
   .sel-dot {
     display: inline-block; width: 9px; height: 9px; border-radius: 0;
-    background: var(--amber); border: 1px solid #000; flex-shrink: 0; margin-top: 3px;
+    background: var(--amber); border: 1px solid #000; flex-shrink: 0;
     /* Solid ring + soft halo - a plain blur glow doesn't read on this light background. */
     box-shadow: 0 0 0 1.5px rgba(242, 172, 65, 0.55), 0 0 7px 3px rgba(242, 172, 65, 0.85);
   }

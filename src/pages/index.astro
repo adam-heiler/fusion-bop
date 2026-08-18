@@ -4,7 +4,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 <BaseLayout title="Overview">
   <section class="hero">
     <div class="hero-heading">
-      <span class="hero-heading-text">Welcome to <span class="hero-fusion">Fusion</span><span class="hero-bop"><span class="bop-letter bop-letter-1">B</span><span class="bop-letter bop-letter-2">o</span><span class="bop-letter bop-letter-3">P</span></span></span>
+      <span class="hero-heading-text">Welcome to <span class="hero-brand"><span class="hero-fusion">Fusion</span><span class="hero-bop"><span class="bop-letter bop-letter-1">B</span><span class="bop-letter bop-letter-2">o</span><span class="bop-letter bop-letter-3">P</span></span></span></span>
       <img src="/logo.png" alt="" class="hero-logo-mark" />
     </div>
 
@@ -79,6 +79,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     color: var(--paper);
     white-space: nowrap;
   }
+  .hero-brand { white-space: nowrap; }
   .hero-fusion, .hero-bop {
     letter-spacing: 0.02em;
     text-transform: uppercase;
