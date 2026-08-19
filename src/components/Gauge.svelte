@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Reusable analog instrument gauge with LCD readout. Semicircular sweep,
-  // 0% at left (180deg) to 100% at right (0deg), over the top.
+  // reusable analog instrument gauge with lcd readout.
+  // semicircular sweep, 0% at left (180deg) to 100% at right (0deg), over the top.
   let {
     value,
     label,
@@ -18,11 +18,11 @@
     accent?: string;
     accentDim?: string;
     warn?: boolean;
-    /** Draws a red hazard band from 0 up to this fraction (e.g. a low-quality cutoff). */
+    /** draws a red hazard band from 0 up to this fraction, e.g. a low-quality cutoff */
     dangerBelow?: number | null;
   } = $props();
 
-  // Per-instance id suffix so multiple gauges don't collide over <defs> ids.
+  // per-instance id suffix so multiple gauges don't collide over defs ids
   const uid = Math.random().toString(36).slice(2, 9);
 
   const cx = 80, cy = 92, R = 52, BEZEL = R + 14;
@@ -103,26 +103,24 @@
       </filter>
     </defs>
 
-    <!-- Machined bezel housing -->
+    <!-- machined bezel housing -->
     <path d={bezelPath} fill="url(#bezel-{uid})" filter="url(#shadow-{uid})" />
     <path d={bezelPath} fill="none" stroke="#8b908e" stroke-width="1" opacity="0.6" />
 
-    <!-- Recessed dial face -->
+    <!-- recessed dial face -->
     <path d={facePath} fill="url(#face-{uid})" />
 
-    <!-- Danger zone -->
+    <!-- danger zone -->
     {#if dangerPath}
       <path d={dangerPath} fill="none" stroke="var(--red, #ff6459)" stroke-width="3.5" stroke-linecap="round" opacity="0.8" />
     {/if}
 
-    <!-- Sweep track + fill -->
+    <!-- sweep track and fill -->
     <path d={trackPath} fill="none" stroke="#b7bcb8" stroke-width="7" stroke-linecap="round" />
-    <!-- Plain stroke, no drop-shadow filter: fillPath's shape changes on every
-         solve, and re-rasterizing a blur filter each time (x4 gauges) was a
-         real contributor to update lag - not worth the subtle glow. -->
+    <!-- plain stroke, no drop-shadow filter, re-rasterizing a blur on every solve was slow -->
     <path d={fillPath} fill="none" stroke={accent} stroke-width="7" stroke-linecap="round" />
 
-    <!-- Tick ring (drawn on top of the track, or the track paints over it) -->
+    <!-- tick ring, drawn on top of the track -->
     {#each TICKS as f (f)}
       {@const t = tickLine(f)}
       <line x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke={t.major ? '#20242a' : '#5b6268'} stroke-width={t.major ? 1.8 : 1.1} />
@@ -132,10 +130,10 @@
       {/if}
     {/each}
 
-    <!-- Glass glare -->
+    <!-- glass glare -->
     <path d={bezelPath} fill="url(#glass-{uid})" clip-path="url(#clip-{uid})" />
 
-    <!-- Needle -->
+    <!-- needle -->
     <g class="needle-grp">
       <polygon points={needlePoly} fill={accentDim} stroke="#0a0b0d" stroke-width="0.5" />
       <circle cx={cx} cy={cy} r="6.5" fill="url(#hub-{uid})" stroke="#0a0b0d" stroke-width="0.6" />
@@ -177,9 +175,8 @@
     transform-origin: 80px 92px;
   }
 
-  /* .gauge-widget has clip-path (for its chamfered corners), which clips box-shadow too -
-     an alarm glow on that element would just get cut off at the corners. Applying it to
-     this unclipped outer wrapper instead lets it actually bleed past the panel edges. */
+  /* gauge-widget's clip-path also clips box-shadow, so an alarm glow on it would
+     get cut off at the corners. applied to this unclipped wrapper instead. */
   .gauge-outer { border-radius: 8px; }
   .gauge-alarm {
     animation: gauge-alarm-glow 1s ease-in-out infinite;

@@ -10,18 +10,14 @@ import CO2BraytonCycle from '../components/CO2BraytonCycle.svelte';
     <img class="cycle-diagram diagram-co2" src="/diagrams/fusion-co2-brayton.png" alt="Process flow diagram of the supercritical CO2 recompression Brayton cycle balance of plant" width="1653" height="800" />
   </div>
   <div class="simulator-box chamfer-panel chamfer-all">
-    <!-- Plain div, not CO2BraytonCycle directly: Astro's own <astro-island>
-         wrapper is display:contents, so chamfer-panel's ">*" z-index promotion
-         (needed to paint above its own textured ::before) silently no-ops on it. -->
+    <!-- plain div, not CO2BraytonCycle directly. astro's own astro-island wrapper
+         is display:contents, so chamfer-panel's z-index promotion no-ops on it. -->
     <div><CO2BraytonCycle client:load /></div>
   </div>
 </BaseLayout>
 
 <style>
-  /* Sized off this diagram's own native resolution (1653x800) at the same
-     scale factor as the Rankine and He diagrams (~0.635x native), so
-     equipment icons and text labels read at a consistent size across all
-     three cycle pages instead of each being stretched to fill an identical
-     container regardless of how much native detail it actually has. */
+  /* sized off this diagram's native resolution, same scale factor as the
+     rankine and he diagrams so labels read at a consistent size across all three. */
   .diagram-co2 { max-width: 1050px; }
 </style>

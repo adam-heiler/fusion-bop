@@ -4,10 +4,8 @@
   import { initCO2Solver, solveCO2Async } from '../lib/co2WorkerClient.js';
   import Gauge from './Gauge.svelte';
 
-  // Slider defaults follow the ARC study (sustainability-16-07480, Tables 8/9):
-  // 455°C turbine inlets, ~280/128/85 bar pressure levels, ~20% recompression
-  // split, eta_c 0.90 / eta_HP 0.90 / eta_LP 0.92 / eta_gen 0.985, 645 MWth.
-  // Pressures in MPa, temperatures °C, effectiveness and split in %.
+  // slider defaults follow the ARC study (sustainability-16-07480, tables 8/9).
+  // pressures in MPa, temperatures degC, effectiveness and split in %.
   const DEFAULTS = {
     P_high: 28, P_mid: 12.8, P_low: 8.5,
     T1: 455, T3: 455, Q: 645,
@@ -35,13 +33,13 @@
   let pc_approach = $state(DEFAULTS.pc_approach);
   let cw_range    = $state(DEFAULTS.cw_range);
 
-  // With no aux-compressor flow, the cycle degenerates to a simple
-  // regenerative Brayton - strike "Recompression" from the title.
+  // with no aux-compressor flow, the cycle degenerates to a simple
+  // regenerative brayton, strike "recompression" from the title
   const isRecompression = $derived(x_aux > 0);
 
-  // Pressure ordering: P_high > P_mid > P_low, all MPa. Unlike the Rankine
+  // pressure ordering: P_high > P_mid > P_low, all MPa. unlike the rankine
   // chain there are no TTD-style phase boundaries here, so plain synchronous
-  // walking is enough - no solver round trips.
+  // walking is enough, no solver round trips.
   const GAP = 0.5; // MPa
   const snap = (v: number) => +v.toFixed(2);
 
@@ -88,7 +86,7 @@
     }
   }
 
-  // Component state (MPa / % sliders) -> solver contract (Pa / fractions).
+  // component state (MPa / % sliders) to solver contract (Pa / fractions)
   function params() {
     return {
       P_high: P_high * 1e6, P_mid: P_mid * 1e6, P_low: P_low * 1e6,
@@ -146,7 +144,7 @@
     runSolve();
   });
 
-  // Gauges
+  // gauges
   const g1Val = $derived(result ? result.eta_1 : 0);
   const g2Val = $derived(result ? Math.min(result.eta_2, 1) : 0);
   const g3Val = $derived(result ? result.bwr : 0);           // back-work ratio
@@ -155,7 +153,7 @@
   const g3AccentDim = $derived(g3Warn ? '#c0392b' : '#6d4fb0');
   const g4Val = $derived(result ? result.regen_share : 0);   // regeneration share
 
-  // T-s diagram geometry. CO2 dome spans s 0.52-2.14 kJ/kg·K, T -56..31°C;
+  // t-s diagram geometry. co2 dome spans s 0.52-2.14 kJ/kg-K, T -56..31degC,
   // the cycle itself sits at s 1.2-2.8, T 0..600.
   const SVG_W = 500, SVG_H = 370;
   const PL = 46, PR = 10, PT = 12, PB = 36;
@@ -540,13 +538,9 @@
   }
   @media (max-width: 800px) { .brayton-wrap { grid-template-columns: 1fr; } }
 
-  /* Independent scroll panes: each column pins to the viewport top and scrolls
-     internally from there, so paging through sliders never carries the T-s
-     diagram/readouts out of view, and vice versa. A vertical seam down the
-     gap is the visual tell that these are two separate scroll regions, not
-     one long page. Both drop back to normal single-column page flow below
-     the breakpoint, where two independent scroll regions would just fight
-     the page's own scroll. */
+  /* independent scroll panes, each column pins to the viewport top and scrolls
+     internally so paging through sliders never carries the diagram out of view.
+     both drop back to normal page flow below the breakpoint. */
   .controls-col, .diagram-col {
     position: sticky;
     top: 16px;
@@ -576,7 +570,7 @@
     .controls-col { padding-right: 0; border-right: none; }
   }
 
-  /* Loading / error */
+  /* loading and error */
   .loading-state {
     grid-column: 1 / -1;
     display: flex; flex-direction: column; align-items: center;
@@ -611,7 +605,7 @@
     to   { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
 
-  /* Gauges */
+  /* gauges */
   .gauge-grid {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px;
   }
@@ -619,7 +613,7 @@
     .gauge-grid { grid-template-columns: repeat(2, 1fr); }
   }
 
-  /* Accordion slider groups */
+  /* accordion slider groups */
   .slider-details {
     margin-bottom: 12px;
   }
@@ -684,7 +678,7 @@
     font-variant-numeric: tabular-nums; min-width: 56px; text-align: right;
   }
 
-  /* Readout cards */
+  /* readout cards */
   .readout-grid {
     display: grid; grid-template-columns: repeat(4, 1fr);
     gap: 8px; margin-top: 14px; margin-bottom: 16px;
@@ -706,7 +700,7 @@
   .readout-value-amber { color: var(--amber-dim); }
   .readout-unit { font-family: var(--font-display); font-size: 11px; font-weight: 700; color: var(--ink-dim); }
 
-  /* State table */
+  /* state table */
   .state-wrap { margin-bottom: 12px; padding: 12px 14px; overflow-x: auto; }
   .state-table {
     width: 100%; border-collapse: collapse; font-size: 13px; color: var(--paper);
@@ -724,7 +718,7 @@
   .state-key { font-weight: 700; color: var(--amber-dim); }
   .stream-cell { color: var(--ink-dim); }
 
-  /* Diagram */
+  /* diagram */
   .diagram-title {
     font-size: 12px; font-weight: 700; color: var(--ink-dim);
     text-transform: uppercase; letter-spacing: 0.07em; margin: 0 0 8px;
@@ -732,7 +726,7 @@
   .scope-panel { padding: 14px; }
   .ts-svg { width: 100%; height: auto; display: block; overflow: visible; }
 
-  /* SVG classes */
+  /* svg classes */
   .axis      { stroke: var(--steel-900); stroke-width: 1; }
   .grid-line { stroke: rgba(0, 0, 0, 0.08); stroke-width: 1; }
   .axis-tick  { font-family: var(--font-mono); font-size: 11px; font-weight: 700; fill: var(--ink-dim); }
@@ -754,7 +748,7 @@
   .state-pt-main { fill: var(--teal-dim); stroke: #000; stroke-width: 0.5; cursor: default; }
   .state-pt-aux  { fill: var(--amber); stroke: #000; stroke-width: 0.5; cursor: default; }
 
-  /* Legend */
+  /* legend */
   .diagram-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 9px; }
   .leg {
     font-size: 12px; font-weight: 700; color: var(--ink-dim);

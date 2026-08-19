@@ -51,8 +51,7 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
 </html>
 
 <script>
-  // Keep --pct in sync with each range input's value so the webkit track
-  // gradient shows the correct filled / unfilled split.
+  // keeps --pct in sync with each range input's value for the webkit track fill
   function setFill(input: HTMLInputElement) {
     const min = parseFloat(input.min) || 0;
     const max = parseFloat(input.max) || 100;
@@ -78,8 +77,7 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
   mo.observe(document.documentElement, { childList: true, subtree: true });
   document.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(attach);
 
-  // Mobile nav: hamburger toggles a slide-in panel, closed by the scrim, a nav
-  // link click, or Escape.
+  // hamburger toggles a slide-in panel, closed by the scrim, a nav link click, or escape
   const navToggle = document.getElementById('nav-toggle');
   const navLinks  = document.getElementById('nav-links');
   const navScrim  = document.getElementById('nav-scrim');
@@ -98,8 +96,8 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
   navLinks?.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setNavOpen(false)));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') setNavOpen(false); });
 
-  // The nav is transition:persist-ed across client-side navigations, so its
-  // server-rendered aria-current goes stale - recompute it after each swap.
+  // nav persists across client-side navigations, so aria-current goes stale.
+  // recompute it after each page swap.
   function updateCurrentLink() {
     const path = location.pathname;
     navLinks?.querySelectorAll('a').forEach(a => {
@@ -132,9 +130,8 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
   }
 
-  /* Constrains nav content to the same standard width as .page-container
-     (see global.css) so the logo and page titles/content share one left
-     edge - the bar itself still spans full width for the background. */
+  /* constrains nav content to the same width as .page-container so the logo
+     and page titles share one left edge. the bar itself stays full width. */
   .site-nav-inner {
     display: flex;
     flex-wrap: nowrap;
@@ -165,15 +162,10 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
   .site-nav .logo-bop { color: var(--teal-dim); }
   .site-nav .site-logo-mark { height: 1.35em; width: auto; display: block; }
 
-  /* Recessed (pressed-in), not raised: dark inset shadow cast from the top lip, subtle
-     light catch at the bottom edge - the opposite lighting convention from a raised chip
-     like the reset button (compare its outer drop-shadow + top highlight). No outer
-     box-shadow either, since a recess doesn't cast a shadow onto the surrounding panel.
-     No texture image of its own, either: the badge sits directly on the nav's own
-     aluminum background, so a separately-sized copy of the same image (via background-size:
-     cover on this tiny box) rendered its grain at a totally different scale than the nav
-     behind it. Just tinting with a transparent gradient lets the nav's own texture show
-     through underneath at the correct, already-matching scale. */
+  /* recessed, not raised: inset shadow from the top lip, light catch at the bottom.
+     no texture image of its own either, a scaled copy of the nav's aluminum grain
+     would render at the wrong scale. a transparent tint gradient lets the nav's own
+     texture show through underneath at the right scale instead. */
   .beta-badge, .updated-badge {
     display: inline-flex;
     align-items: center;
@@ -187,9 +179,8 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
     background-image: linear-gradient(180deg, rgba(0, 0, 0, 0.16), transparent 45%, rgba(255, 255, 255, 0.16));
     border: 1px solid rgba(20, 24, 26, 0.2);
     border-radius: 999px;
-    /* Right padding trimmed by the letter-spacing value: letter-spacing adds a trailing
-       gap after the last character that isn't part of any glyph, so equal left/right
-       padding leaves the text looking shifted left in the pill. */
+    /* right padding trimmed by the letter-spacing value, otherwise the trailing
+       gap after the last character leaves the text looking shifted left. */
     padding: 0.2rem calc(0.6rem - 0.1em) 0.2rem 0.6rem;
     white-space: nowrap;
     box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.45), inset 0 -1px 0 rgba(255, 255, 255, 0.4);
@@ -207,8 +198,8 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
     gap: 0.4rem;
   }
 
-  /* Nav links: same chamfered-metal chip chrome as the reset button (compare
-     RankineCycle.svelte's .reset-btn) - a persistent raised chip, not just a hover pill. */
+  /* same chamfered metal chip chrome as the reset button in RankineCycle.svelte.
+     a persistent raised chip, not just a hover pill. */
   .site-nav .nav-links a {
     display: inline-flex;
     align-items: center;
@@ -227,8 +218,7 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
     color: var(--teal-dim);
     filter: brightness(1.08);
   }
-  /* Click flash: a brief, bright teal glow (the same teal as "BoP" in the
-     logo) at the instant of clicking, on top of the existing press-down. */
+  /* brief teal glow flash on click, same teal as "BoP" in the logo */
   .site-nav .nav-links a:active {
     transform: translateY(1px);
     filter: brightness(0.94);
@@ -236,9 +226,7 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
     text-shadow: 0 0 10px var(--teal), 0 0 2px var(--teal);
     transition: transform 0.1s ease, filter 0.1s ease, text-shadow 0.05s ease;
   }
-  /* Current page: teal color only, no persistent glow - the glow stays reserved for the
-     click flash above, so you can see at a glance which page you're on without every page
-     load looking lit up. */
+  /* current page gets teal color only, no glow. glow stays reserved for the click flash. */
   .site-nav .nav-links a[aria-current="page"] {
     color: var(--teal-dim);
   }
@@ -246,7 +234,7 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
     color: var(--teal-dim);
   }
 
-  /* Hamburger toggle - hidden above the breakpoint, replaces nav-link wrapping below it */
+  /* hamburger toggle, hidden above the breakpoint, replaces nav link wrapping below it */
   .nav-toggle {
     display: none;
     flex-direction: column;
@@ -286,10 +274,8 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
 
   body.nav-lock { overflow: hidden; }
 
-  /* Breakpoint sits just above where the full link row stops fitting on one
-     line (measured ~1090px of actual content) - below it the links move
-     into the slide-in panel instead of wrapping into a broken-looking
-     two-row bar. */
+  /* breakpoint sits just above where the link row stops fitting on one line.
+     below it, links move into the slide-in panel instead of wrapping into two rows. */
   @media (max-width: 1140px) {
     .site-nav .nav-links {
       position: fixed;

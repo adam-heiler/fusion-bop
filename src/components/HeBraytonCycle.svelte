@@ -4,14 +4,9 @@
   import { initHESolver, solveHEAsync } from '../lib/heWorkerClient.js';
   import Gauge from './Gauge.svelte';
 
-  // Slider defaults follow the ARC study (sustainability-16-07480, Tables 13/14):
-  // 530°C turbine inlet, ~50/35/23 bar pressure levels, both compressor/turbine
-  // outlet temps at 40°C, eta_turb 0.95 / eta_comp 0.90 / eta_gen 0.985,
-  // 645 MWth. regen_dP_pct 3.5% is the one modeled HX pressure drop - see
-  // heBraytonSolver.js for the validated-vs-paper writeup (net power,
-  // net/gross efficiency, and back-work ratio all match the paper to
-  // within ~1% at these defaults).
-  // Pressures in MPa, temperatures °C, effectiveness/drop in %.
+  // slider defaults follow the ARC study (sustainability-16-07480, tables 13/14).
+  // see heBraytonSolver.js for the validated-vs-paper writeup, matches within ~1%
+  // at these defaults. pressures in MPa, temperatures degC, effectiveness/drop in %.
   const DEFAULTS = {
     P_high: 5.0, P_mid: 3.5, P_low: 2.3,
     T1: 530, Q: 645,
@@ -37,9 +32,9 @@
   let itc_approach = $state(DEFAULTS.itc_approach);
   let cw_range    = $state(DEFAULTS.cw_range);
 
-  // Pressure ordering: P_high > P_mid > P_low, all MPa. No TTD-style phase
-  // boundaries to enforce here (helium never condenses in this range), so
-  // plain synchronous chain-walking is enough - no solver round trips.
+  // pressure ordering: P_high > P_mid > P_low, all MPa. no TTD-style phase
+  // boundaries here, helium never condenses in this range, so plain
+  // synchronous chain-walking is enough, no solver round trips.
   const GAP = 0.2; // MPa
   const snap = (v: number) => +v.toFixed(2);
 
@@ -86,7 +81,7 @@
     }
   }
 
-  // Component state (MPa / % sliders) -> solver contract (Pa / fractions).
+  // component state (MPa / % sliders) to solver contract (Pa / fractions)
   function params() {
     return {
       P_high: P_high * 1e6, P_mid: P_mid * 1e6, P_low: P_low * 1e6,
@@ -138,17 +133,14 @@
 
   onMount(async () => {
     await initHESolver();
-    // CoolProp's WASM module itself loads fast (~100ms), but its first
-    // property lookup for 'Helium' specifically has its own ~2.5s one-time
-    // cold-start cost (loading Helium's reference EOS data - CO2 and water
-    // don't pay this, their first lookups are near-instant). Awaiting this
-    // first solve before dropping the spinner keeps that cost inside the
-    // loading screen instead of leaving a blank half-loaded UI.
+    // CoolProp's wasm module loads fast, but its first helium property lookup
+    // has its own ~2.5s cold-start cost loading helium's reference EOS data.
+    // awaiting this first solve keeps that cost inside the loading screen.
     await runSolve();
     loading = false;
   });
 
-  // Gauges
+  // gauges
   const g1Val = $derived(result ? result.eta_1 : 0);
   const g2Val = $derived(result ? Math.min(result.eta_2, 1) : 0);
   const g3Val = $derived(result ? result.bwr : 0);           // back-work ratio
@@ -157,11 +149,9 @@
   const g3AccentDim = $derived(g3Warn ? '#c0392b' : '#6d4fb0');
   const g4Val = $derived(result ? result.regen_share : 0);   // regeneration share
 
-  // T-s diagram geometry. Helium's own s-scale runs far higher than CO2's or
-  // water's (its low molar mass gives it a much larger specific gas constant),
-  // so this cycle sits at s ~20-26 kJ/kg·K, T 20-560°C - no saturation dome
-  // to draw (helium's critical point, -268°C/0.23 MPa, is nowhere near this
-  // range; the fluid is single-phase everywhere here).
+  // t-s diagram geometry. helium's s-scale runs far higher than CO2's or water's,
+  // this cycle sits at s ~20-26 kJ/kg-K, T 20-560degC. no saturation dome to draw,
+  // helium's critical point is nowhere near this range, fluid is single-phase here.
   const SVG_W = 500, SVG_H = 370;
   const PL = 46, PR = 10, PT = 12, PB = 36;
   const CW = SVG_W - PL - PR, CH = SVG_H - PT - PB;
@@ -518,9 +508,8 @@
   }
   @media (max-width: 800px) { .brayton-wrap { grid-template-columns: 1fr; } }
 
-  /* Independent scroll panes - see RankineCycle.svelte / CO2BraytonCycle.svelte
-     for the full rationale. A vertical seam down the gap is the visual tell
-     that these are two separate scroll regions, not one long page. */
+  /* independent scroll panes, see RankineCycle.svelte / CO2BraytonCycle.svelte
+     for the full rationale */
   .controls-col, .diagram-col {
     position: sticky;
     top: 16px;
@@ -550,7 +539,7 @@
     .controls-col { padding-right: 0; border-right: none; }
   }
 
-  /* Loading / error */
+  /* loading and error */
   .loading-state {
     grid-column: 1 / -1;
     display: flex; flex-direction: column; align-items: center;
@@ -585,7 +574,7 @@
     to   { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
 
-  /* Gauges */
+  /* gauges */
   .gauge-grid {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px;
   }
@@ -593,7 +582,7 @@
     .gauge-grid { grid-template-columns: repeat(2, 1fr); }
   }
 
-  /* Accordion slider groups */
+  /* accordion slider groups */
   .slider-details {
     margin-bottom: 12px;
   }
@@ -658,7 +647,7 @@
     font-variant-numeric: tabular-nums; min-width: 56px; text-align: right;
   }
 
-  /* Readout cards */
+  /* readout cards */
   .readout-grid {
     display: grid; grid-template-columns: repeat(4, 1fr);
     gap: 8px; margin-top: 14px; margin-bottom: 16px;
@@ -680,7 +669,7 @@
   .readout-value-amber { color: var(--amber-dim); }
   .readout-unit { font-family: var(--font-display); font-size: 11px; font-weight: 700; color: var(--ink-dim); }
 
-  /* State table */
+  /* state table */
   .state-wrap { margin-bottom: 12px; padding: 12px 14px; overflow-x: auto; }
   .state-table {
     width: 100%; border-collapse: collapse; font-size: 13px; color: var(--paper);
@@ -697,7 +686,7 @@
   }
   .state-key { font-weight: 700; color: var(--amber-dim); }
 
-  /* Diagram */
+  /* diagram */
   .diagram-title {
     font-size: 12px; font-weight: 700; color: var(--ink-dim);
     text-transform: uppercase; letter-spacing: 0.07em; margin: 0 0 8px;
@@ -705,7 +694,7 @@
   .scope-panel { padding: 14px; }
   .ts-svg { width: 100%; height: auto; display: block; overflow: visible; }
 
-  /* SVG classes */
+  /* svg classes */
   .axis      { stroke: var(--steel-900); stroke-width: 1; }
   .grid-line { stroke: rgba(0, 0, 0, 0.08); stroke-width: 1; }
   .axis-tick  { font-family: var(--font-mono); font-size: 11px; font-weight: 700; fill: var(--ink-dim); }
@@ -722,7 +711,7 @@
 
   .state-pt { fill: var(--paper); stroke: #000; stroke-width: 0.5; cursor: default; }
 
-  /* Legend */
+  /* legend */
   .diagram-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 9px; }
   .leg {
     font-size: 12px; font-weight: 700; color: var(--ink-dim);

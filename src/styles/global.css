@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
-/* Design tokens. Light industrial theme: brushed aluminum, chamfered plates,
-   amber/teal/blue instrument colors. --steel-* runs 300 (lightest) to 900 (darkest). */
+/* design tokens. light industrial theme: brushed aluminum, chamfered plates,
+   amber/teal/blue accents. steel-* runs 300 (lightest) to 900 (darkest). */
 :root {
   --steel-900: #969ca3;
   --steel-800: #adb3b9;
@@ -26,8 +26,8 @@
   --red: #ff6459;
   --red-dim: #c0392b;
   --chamfer: 14px;
-  --aluminum: url('/textures/brushed-aluminum.webp'); /* never tiled, always background-size: cover */
-  --stainless: url('/textures/stainless-steel.webp'); /* grain-free, safe for small/stretched crops */
+  --aluminum: url('/textures/brushed-aluminum.webp'); /* never tiled, always background-size cover */
+  --stainless: url('/textures/stainless-steel.webp'); /* grain-free, safe for small or stretched crops */
 
   --font-display: 'Inter', 'Segoe UI', sans-serif;
   --font-mono: 'Inter Tight', 'Inter', 'Segoe UI', sans-serif;
@@ -50,28 +50,22 @@ h1, h2, h3, h4 {
   letter-spacing: 0.01em;
 }
 
-/* Standard content width for ordinary page content, so a page's own titles/
-   text sit flush with the same left edge the interactive simulators already
-   use (their wrapper matches this width). Full-bleed elements like the nav
-   or the overview page's banners intentionally don't use this. */
+/* standard content width, page titles line up with the simulator wrapper's left edge.
+   full-bleed elements like the nav and hero banner skip this. */
 .page-container {
   max-width: 1280px;
   margin: 0 auto;
 }
 
-/* Wider breakout for content that benefits from more room than the standard
-   column - process diagrams, hero banners. Still centered and still capped,
-   so it never truly goes edge-to-edge on huge monitors. */
+/* wider column for content that needs more room, process diagrams and hero banners.
+   still centered and capped, never edge to edge on huge monitors. */
 .page-breakout {
   max-width: 1760px;
   margin: 0 auto;
 }
 
-/* Boxes each interactive simulator (its own title + controls + diagram +
-   readouts) in its own chamfered steel panel - it's narrower than the
-   standard page column (matches the sliders' own tuned width), so without a
-   boundary of its own it just read as a stray, oddly-narrow column instead
-   of a deliberate module. Combine with chamfer-panel chamfer-all. */
+/* boxes each simulator in its own chamfered panel, narrower than the page column.
+   combine with chamfer-panel chamfer-all. */
 .simulator-box {
   max-width: 1100px;
   margin: 0 auto 32px;
@@ -83,19 +77,16 @@ h1, h2, h3, h4 {
   background-blend-mode: normal;
 }
 @media (max-width: 480px) {
-  /* On top of <main>'s own 24px gutter, the full 36px side padding here left
-     almost no room for the two-column grids inside (gauges, readout cards),
-     forcing them to overflow the viewport. */
+  /* main already has 24px padding, the full 36px side padding here left no room
+     for the two column grids inside (gauges, readout cards). */
   .simulator-box {
     padding: 20px 14px;
   }
 }
 
-/* Process-flow diagrams (rankine/co2-brayton/he-brayton pages): each page
-   sets its own max-width (a fixed fraction of that image's native pixel
-   resolution) so equipment icons and labels render at the same on-screen
-   size everywhere, rather than every diagram being force-fit to one shared
-   container width regardless of how much detail it actually contains. */
+/* process flow diagrams on the rankine/co2-brayton/he-brayton pages.
+   each page sets its own max-width based on the image's native resolution
+   so labels render at a consistent size everywhere. */
 .cycle-diagram {
   display: block;
   width: 100%;
@@ -103,24 +94,9 @@ h1, h2, h3, h4 {
   margin: 0 auto 28px;
   filter: drop-shadow(0 4px 10px rgba(20, 24, 26, 0.12));
 }
-@media (max-width: 720px) {
-  /* These diagrams are dense - equipment icons and text labels baked into
-     the image - so shrinking to the viewport's full width like everything
-     else made all of that unreadably tiny. A legible floor width instead,
-     with the wrapper scrolling horizontally below that. */
-  .page-breakout {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .cycle-diagram {
-    width: auto;
-    min-width: 640px;
-  }
-}
 
-/* Shared section-title look (RankineCycle.svelte's scoped .page-title
-   mirrors this - kept in sync by hand since Svelte scoping means the two
-   can't share one rule). */
+/* shared section title style. RankineCycle's scoped .page-title mirrors this
+   by hand since svelte scoping means the two can't share one rule. */
 .page-title {
   font-family: var(--font-display);
   font-size: 24px;
@@ -131,12 +107,12 @@ h1, h2, h3, h4 {
   line-height: 1.3;
 }
 
-/* Numeric / instrument text everywhere */
+/* numeric and instrument text */
 .mono, .lcd, .gauge-value, .readout-value, .slider-value {
   font-family: var(--font-mono);
 }
 
-/* Chamfered steel panel: outer clips to a hexagon, inset ::before fakes a bevel border. */
+/* chamfered steel panel. outer clips to a hexagon, inset ::before fakes a bevel border. */
 .chamfer-panel {
   --cf: var(--chamfer);
   position: relative;
@@ -157,7 +133,7 @@ h1, h2, h3, h4 {
   background-position: center, center;
   background-blend-mode: overlay;
 }
-/* Modifier: chamfer all four corners instead of just the opposing pair. */
+/* chamfers all four corners instead of just the opposing pair. */
 .chamfer-all {
   clip-path: polygon(
     var(--cf) 0, calc(100% - var(--cf)) 0,
@@ -179,10 +155,10 @@ h1, h2, h3, h4 {
   z-index: 1;
 }
 
-/* Small chamfer for compact chips/badges */
+/* small chamfer for compact chips and badges */
 .chamfer-sm { --cf: 6px; }
 
-/* Drafting-paper panel: near-white sheet on a chamfered aluminum mat. */
+/* drafting paper panel, near-white sheet on a chamfered aluminum mat. */
 .drafting-mat {
   padding: 18px;
   margin-bottom: 28px;
@@ -207,7 +183,7 @@ h1, h2, h3, h4 {
   height: auto;
   filter: drop-shadow(0 2px 4px rgba(60, 50, 20, 0.1));
 }
-/* ANSI/ISO "trim line" frame plus corner registration marks. */
+/* trim line frame plus corner registration marks. */
 .drafting-frame {
   position: absolute;
   inset: 14px;
@@ -227,8 +203,7 @@ h1, h2, h3, h4 {
 .drafting-corner.bl { bottom: 4px; left: 4px; border-width: 0 0 1.5px 1.5px; }
 .drafting-corner.br { bottom: 4px; right: 4px; border-width: 0 1.5px 1.5px 0; }
 
-/* Title block: a proper bordered ANSI-style cell grid rather than a plain
-   line of text, so the sheet reads unmistakably as an engineering drawing. */
+/* title block as a bordered cell grid so the sheet reads as an engineering drawing. */
 .drafting-titleblock {
   display: grid;
   grid-template-columns: 1fr 130px;
@@ -270,7 +245,7 @@ h1, h2, h3, h4 {
 .tb-row .tb-key { color: #8a8064; }
 .tb-row .tb-val { font-weight: 700; color: #4a4432; }
 
-/* LCD-style readout chip: light matte e-ink look, no glow (reflective, not backlit). */
+/* lcd readout chip, matte e-ink look, no glow. reflective, not backlit. */
 .lcd {
   --accent: var(--amber-dim);
   display: inline-flex;
@@ -285,15 +260,12 @@ h1, h2, h3, h4 {
   letter-spacing: 0.03em;
 }
 
-/* Cross-browser range slider - recessed groove + machined knob */
+/* cross-browser range slider, recessed groove and machined knob */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
-  /* iOS Safari can fall back to its own native slider thumb (a plain white circle,
-     ignoring all custom pseudo-element styling below) when the system is in Dark
-     Mode and the page hasn't told it this control should stay in light appearance.
-     The site-wide `html { color-scheme: light }` isn't always enough by itself -
-     setting it directly on the control is the documented fix. */
+  /* ios safari falls back to a plain white thumb in dark mode unless color-scheme
+     is set directly on the control, not just on html. */
   color-scheme: light;
   width: 100%;
   height: 22px;
@@ -312,20 +284,11 @@ input[type="range"]::-webkit-slider-runnable-track {
   border: 1px solid var(--hairline);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
 }
-/* Knob tinted to match each slider's own --slider-color: a neutral (silver) base photo
-   keeps its metallic shading/highlights, and the --slider-tint gradient layered on top
-   of it recolors it - via plain alpha compositing, not background-blend-mode: color.
-   The blend-mode version looked right on desktop but silently no-ops on
-   ::-webkit-slider-thumb on real mobile Safari/Chrome (a known gap: shadow
-   pseudo-elements like the range thumb don't reliably support blend modes on mobile
-   WebKit/Blink, even though the same property works fine on ordinary elements) -
-   every phone fell back to a bare, untinted, un-textured native thumb in both light
-   and dark mode. Plain layered backgrounds don't depend on blend-mode support at all,
-   so the photo renders (with a lighter, alpha-mixed tint instead of a hue/saturation
-   match) everywhere. Uses --slider-tint (a plain rgba() set alongside --slider-color at
-   each slider group) instead of color-mix() - color-mix() support is inconsistent on
-   real phone browsers too, and when it fails the whole background-image value is
-   dropped, not just the tint. */
+/* knob tint uses layered backgrounds, not background-blend-mode, since blend modes
+   don't reliably apply to the range thumb pseudo-element on mobile safari/chrome.
+   uses --slider-tint (plain rgba, set alongside --slider-color per slider group)
+   instead of color-mix, since color-mix support is inconsistent on phones and
+   drops the whole background when unsupported. */
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 20px;
@@ -333,7 +296,7 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 50%;
   background-image: linear-gradient(var(--slider-tint, rgba(20, 184, 166, 0.2)), var(--slider-tint, rgba(20, 184, 166, 0.2))), url('/buttons/knob-silver.png');
   background-size: 100% 100%, cover;
-  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.5); /* not filter: drop-shadow - cheaper to animate */
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.5); /* not filter drop-shadow, cheaper to animate */
   margin-top: -6.5px;
   cursor: pointer;
   transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease;
@@ -376,7 +339,7 @@ input[type="range"]:active::-moz-range-thumb {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
-/* Scrollbar (webkit) to match the theme */
+/* webkit scrollbar to match the theme */
 ::-webkit-scrollbar { width: 12px; height: 12px; }
 ::-webkit-scrollbar-track { background: var(--steel-900); }
 ::-webkit-scrollbar-thumb {

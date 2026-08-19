@@ -10,14 +10,13 @@ import HeBraytonCycle from '../components/HeBraytonCycle.svelte';
     <img class="cycle-diagram diagram-he" src="/diagrams/fusion-he-brayton.png" alt="Process flow diagram of the closed-loop helium Brayton cycle balance of plant" width="1667" height="755" />
   </div>
   <div class="simulator-box chamfer-panel chamfer-all">
-    <!-- Plain div, not HeBraytonCycle directly: Astro's own <astro-island>
-         wrapper is display:contents, so chamfer-panel's ">*" z-index promotion
-         (needed to paint above its own textured ::before) silently no-ops on it. -->
+    <!-- plain div, not HeBraytonCycle directly. astro's own astro-island wrapper
+         is display:contents, so chamfer-panel's z-index promotion no-ops on it. -->
     <div><HeBraytonCycle client:load /></div>
   </div>
 </BaseLayout>
 
 <style>
-  /* See co2-brayton.astro - same native-resolution-based scale factor. */
+  /* see co2-brayton.astro, same native-resolution scale factor. */
   .diagram-he { max-width: 1059px; }
 </style>

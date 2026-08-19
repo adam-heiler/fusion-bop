@@ -35,19 +35,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 </BaseLayout>
 
 <style>
-  /* Full-bleed hero: breaks out of the page's own padding entirely (matches
-     how the nav itself spans edge to edge) - the negative top margin also
-     cancels out <main>'s own top padding so this sits flush against the nav
-     bar with no gap.
-
-     Light brushed metal, the site's standard recipe (compare the nav): the
-     aluminum grain shows through a steel gradient (overlay preserves the
-     grain) with a soft white highlight up top for a lit-from-above sheen.
-
-     overflow: hidden contains the spinning BOP-node glow (an oversized abs-
-     positioned child): clip-path hides its paint but not its layout box, so
-     without this the rotating box grew the page's scroll height and the whole
-     site nudged up and down as it turned. */
+  /* full-bleed hero, breaks out of the page padding to sit flush against the nav.
+     overflow hidden stops the spinning bop node glow from growing page height. */
   .hero {
     position: relative;
     overflow: hidden;
@@ -86,14 +75,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   }
   .hero-fusion { color: var(--paper); }
 
-  /* BoP letters take turns lighting up bright teal in sequence, looping.
-     Longhand animation-* properties (not the `animation` shorthand) here and
-     on .bop-node-letter below: the shorthand resets every sub-property it
-     doesn't mention - including animation-delay - back to 0s. Since these
-     two rules and the .bop-letter-N delay rules all match the same elements,
-     whichever one used the shorthand would silently wipe out the staggered
-     delays that make B/O/P line up with their counterparts in "Balance of
-     Plant" below. */
+  /* bop letters flash teal in sequence, looping.
+     longhand animation properties, not the shorthand, so animation-delay isn't reset. */
   .bop-letter {
     display: inline-block;
     color: var(--teal-dim);
@@ -105,18 +88,15 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   .bop-letter-1 { animation-delay: 0s; }
   .bop-letter-2 { animation-delay: 0.8s; }
   .bop-letter-3 { animation-delay: 1.6s; }
-  /* Pure white on this light metal would just vanish, so the flash peak is a
-     white-hot core wrapped in a saturated teal glow - reads as the letter
-     lighting up rather than disappearing. Shared verbatim by the box letters
-     below so both flash the identical color. */
+  /* white flash reads as the letter lighting up instead of vanishing on the light panel.
+     same keyframe shape reused below for the bop node letters. */
   @keyframes bop-letter-glow {
     0%, 12%, 100% { color: var(--teal-dim); text-shadow: none; }
     6% { color: #ffffff; text-shadow: 0 0 4px var(--teal), 0 0 1px rgba(255, 255, 255, 0.9); }
   }
 
-  /* Three equal-width regions (side / bop / side) so the BOP node always
-     sits dead-center under the heading above, regardless of the tokamak
-     and powerline art having different native widths. */
+  /* three equal columns so the bop node stays centered under the heading
+     regardless of the art widths on each side. */
   .hero-flow {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
@@ -136,17 +116,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     height: clamp(160px, 22vw, 320px);
     flex-shrink: 0;
   }
-  /* The powerline art is a narrow portrait crop, so at the same height as
-     the tokamak it reads as smaller/less prominent - sized up on its own
-     to hold its own visually against the tokamak. A second, shorter tower to
-     its right widens the pair so it balances the broad tokamak on the left.
-     Both towers bottom-align (align-self) so they stand on a common ground
-     line instead of floating at different mid-heights. */
+  /* powerline art is a narrow crop, sized up so it holds its own against the tokamak.
+     both towers bottom-align to a shared ground line. */
   .hero-art-powerline { height: clamp(200px, 27vw, 400px); align-self: flex-end; transform: translateX(-6.77%); }
-  /* Second tower: shorter, tucked in close (negative margin overlaps the art's
-     transparent padding), and lifted off the ground line a touch so its base
-     sits higher than the front tower - reads as a smaller tower set further
-     back in perspective. */
+  /* second tower is shorter and tucked in close, lifted a bit to read as set further back. */
   .hero-art-powerline-2 {
     height: clamp(110px, 15vw, 230px);
     align-self: flex-end;
@@ -154,9 +127,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     margin-bottom: clamp(16px, 4vw, 54px);
   }
 
-  /* Power flow: a plain moving dashed line - no glow, just the animation.
-     Fixed width (not flex-grow) so both sides are always the same length
-     regardless of the tokamak and powerline art having different widths. */
+  /* moving dashed line between the art and the bop node.
+     fixed width so both sides stay the same length. */
   .flow-pipe {
     flex: none;
     width: clamp(50px, 6vw, 110px);
@@ -170,19 +142,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     to { background-position: 48px 0; }
   }
 
-  /* BOP node: a light chamfered instrument plate (like the equipment blocks
-     in the process-flow diagrams) rather than dark-on-dark - reads clearly
-     against the dark hero without needing a glow to be legible. A landscape
-     plate (not a square) gives the left-aligned label somewhere to sit
-     instead of just floating centered.
-
-     Border treatment is a light chasing around the chamfered edge, not a
-     static colored line: .bop-node-frame is a couple px larger than the
-     plate and clipped to the identical chamfer shape; a spinning, oversized
-     conic-gradient div sits behind the plate, so only a thin ring of it
-     peeks out around the perimeter - clip-path clips the whole subtree
-     (including this absolutely-positioned, off-box child), so the rotation
-     never escapes the chamfer outline. */
+  /* bop node is a light chamfered plate, landscape shape so the label has room.
+     border is a spinning glow ring peeking through a small gap around the plate,
+     clipped to the same chamfer shape so it never escapes the outline. */
   .bop-node-frame {
     position: relative;
     flex-shrink: 0;
@@ -230,11 +192,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     line-height: 1.25;
     white-space: nowrap;
   }
-  /* First letter of each line reads as the BOP acronym reveal - larger and
-     teal-tinted at rest. Shares the .bop-letter-N delay classes with the
-     heading above (see the note there on why longhand, not shorthand), so
-     each letter here lights up in the same instant as its counterpart in
-     "FusionBoP" - the B's together, then the O's, then the P's. */
+  /* first letter of each line is bigger and teal, matches the heading's flash timing. */
   .bop-node-letter {
     display: inline-block;
     font-size: 1.2em;
@@ -246,8 +204,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     animation-timing-function: ease-in-out;
     animation-iteration-count: infinite;
   }
-  /* Identical peak to the heading's bop-letter-glow so the acronym flashes the
-     same white-hot color in both places. */
+  /* same flash color as the heading. */
   @keyframes bop-node-letter-glow {
     0%, 12%, 100% { color: var(--teal-dim); text-shadow: none; }
     6% { color: #ffffff; text-shadow: 0 0 4px var(--teal), 0 0 1px rgba(255, 255, 255, 0.9); }
@@ -255,9 +212,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
   @media (max-width: 720px) {
     .hero { padding: 32px 20px; }
-    .hero-heading { text-align: center; }
-    .hero-heading-text { white-space: normal; font-size: clamp(28px, 7.5vw, 46px); }
-    .hero-logo-mark { height: 34px; }
+    .hero-heading { text-align: center; flex-wrap: nowrap; gap: 6px; }
+    .hero-heading-text { font-size: clamp(15px, 6vw, 46px); }
+    .hero-logo-mark { height: clamp(18px, 6vw, 44px); }
 
     .hero-flow {
       display: flex;

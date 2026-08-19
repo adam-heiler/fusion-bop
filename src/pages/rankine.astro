@@ -10,18 +10,14 @@ import RankineCycle from '../components/RankineCycle.svelte';
     <img class="cycle-diagram diagram-rankine" src="/diagrams/fusion-rankine.png" alt="Process flow diagram of the supercritical reheat regenerative Rankine cycle balance of plant" width="2457" height="1052" />
   </div>
   <div class="simulator-box chamfer-panel chamfer-all">
-    <!-- Plain div, not RankineCycle directly: Astro's own <astro-island> wrapper
-         is display:contents, so chamfer-panel's ">*" z-index promotion (needed
-         to paint above its own textured ::before) silently no-ops on it. -->
+    <!-- plain div, not RankineCycle directly. astro's own astro-island wrapper
+         is display:contents, so chamfer-panel's z-index promotion no-ops on it. -->
     <div><RankineCycle client:load /></div>
   </div>
 </BaseLayout>
 
 <style>
-  /* Diagrams are sized off their own native resolution (see NOTES in
-     co2-brayton.astro / he-brayton.astro) rather than all sharing one
-     container width, so equipment icons and labels read at a consistent
-     size across the three cycle pages. Rankine has roughly twice the
-     equipment of the other two, hence the noticeably wider cap. */
+  /* sized off native resolution like the other cycle pages. rankine has roughly
+     twice the equipment of the other two, hence the wider cap. */
   .diagram-rankine { max-width: 1560px; }
 </style>

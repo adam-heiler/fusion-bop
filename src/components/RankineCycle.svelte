@@ -4,9 +4,9 @@
   import { initSolver, solveCycleAsync, minPCAsync, minPGAsync, maxPEAsync } from '../lib/solverWorkerClient.js';
   import Gauge from './Gauge.svelte';
 
-  // Slider defaults, also used by the Reset button below. Pressures: MPa for
-  // the high-pressure sliders (P1/P_VA/P_B/P2), kPa for the rest. Temperatures
-  // in °C - the convention thermo water tables use.
+  // slider defaults, also used by the reset button below. pressures are MPa for
+  // the high-pressure sliders (P1/P_VA/P_B/P2), kPa for the rest. temperatures
+  // in degC, the convention thermo water tables use.
   const DEFAULTS = {
     P1: 25, T1: 540, T3: 500, P2: 6, P4: 500, reheat_dP_pct: 3,
     P_VA: 11.7, P_B: 10, P_C: 750, P_D: 600, P_E: 430, P_F: 220, P_G: 150,
@@ -45,7 +45,7 @@
   let r_cw        = $state(DEFAULTS.r_cw);
   let UA          = $state(DEFAULTS.UA);
 
-  // Pa/K directly - these are solver-only constants, never shown as sliders.
+  // Pa/K directly, solver-only constants, never shown as sliders
   const FIXED = {
     P_feedpump: 25e6, subcool: 2.8,
   };
@@ -53,8 +53,8 @@
   const PCRIT = 22.064; // MPa
   const isSupercritical = $derived(P1 >= PCRIT);
 
-  // Pressure ordering enforcement. Required chain: P1 > P_VA > P_B > P2 > P_C >
-  // P_D > P4 > P_E > P_F > P_G. See NOTES.md for why.
+  // pressure ordering enforcement. required chain: P1 > P_VA > P_B > P2 > P_C >
+  // P_D > P4 > P_E > P_F > P_G, see NOTES.md for why.
   const GAP = 1e4; // Pa (10 kPa), minimum enforced separation between chain neighbors
 
   let orderWarning = $state('');
@@ -72,35 +72,30 @@
     return m ? `P<sub>${m[1]}</sub>` : name;
   }
 
-  // Minimum P_C keeping FWH4's extraction fraction non-negative. P_C is kPa
-  // in component state; the solver wants Pa.
+  // minimum P_C keeping FWH4's extraction fraction non-negative.
+  // P_C is kPa in component state, the solver wants Pa.
   async function minPC(): Promise<number> {
     const pa = await minPCAsync(P_D * 1e3, TTD, eta_pump);
     return pa / 1e3;
   }
 
-  // Minimum P_G keeping FWH1's extraction fraction non-negative. Depends on
-  // the condensate pump's discharge pressure (P_condpump), since that's the
-  // pressure FWH1's tube side is compressed to.
+  // minimum P_G keeping FWH1's extraction fraction non-negative.
+  // depends on P_condpump, the pressure FWH1's tube side is compressed to.
   async function minPG(): Promise<number> {
     const T6C_est = result ? result.T6C : (25 + cw_approach + 13);
     const pa = await minPGAsync(T6C_est, TTD, eta_pump, P_condpump * 1e3);
     return pa / 1e3;
   }
 
-  // Maximum P_E before FWH3's feedwater outlet (at P_condpump) flashes to vapor.
+  // maximum P_E before FWH3's feedwater outlet (at P_condpump) flashes to vapor
   async function maxPE(): Promise<number> {
     const pa = await maxPEAsync(TTD, P_condpump * 1e3);
     return pa / 1e3;
   }
 
-  // Chain get/set always operate in Pascals internally, regardless of which
-  // unit (MPa or kPa) a given slider displays - the ordering comparisons
-  // would otherwise be comparing across two different units. Rounding
-  // happens inside each setter, after converting back to the slider's own
-  // display unit (rounding the raw Pascal value first would be meaningless -
-  // 3 decimal places of a multi-million-Pascal number is far finer than the
-  // slider's own precision).
+  // chain get/set always operate in pascals internally, regardless of which
+  // unit a slider displays, otherwise ordering comparisons cross two units.
+  // rounding happens in each setter after converting back to the display unit.
   type Chain = [string, () => number, (v: number) => void, number, number][];
   function getChain(): Chain {
     return [
@@ -118,7 +113,7 @@
   }
   const snap = (v: number) => +v.toFixed(3);
 
-  // Clamps the TTD-aware boundaries (P_C, P_G, P_E); returns a reason per boundary that fired.
+  // clamps the TTD-aware boundaries (P_C, P_G, P_E), returns a reason per boundary that fired
   async function enforceTTDBoundaries(): Promise<string[]> {
     const chain = getChain();
     const reasons: string[] = [];
@@ -145,8 +140,8 @@
     }
     const peMax = await maxPE();
     if (peMax > 0 && P_E > peMax) {
-      // Chain bounds/GAP are Pascal-scale; peMax came back in kPa (P_E's own
-      // unit) from the wrapper above, so convert peLo/GAP to kPa here too.
+      // chain bounds and GAP are pascal-scale, peMax came back in kPa (P_E's
+      // own unit), so convert peLo/GAP to kPa here too
       const [, , , peLo] = chain[chain.findIndex(([n]) => n === 'P_E')];
       P_E = snap(Math.max(peLo / 1e3, peMax - GAP / 1e3));
       reasons.push(`${subLabel('P_E')} (FWH3) lowered to ${P_E} kPa - above this, the shell steam is hotter than the condensate line pressure can keep liquid, so the feedwater would flash to vapor inside the FWH3 tubes.`);
@@ -157,11 +152,9 @@
       }
     }
 
-    // Condensate (at P_condpump) mixes directly into the deaerator (at P_D) with
-    // no pump modeled in between - it has to already be at or above deaerator
-    // pressure, or it couldn't physically flow in. Unlike the P_C/P_G/P_E
-    // checks above, this isn't a thermodynamic-property lookup, just a plain
-    // pressure comparison, so no async solver call is needed.
+    // condensate (at P_condpump) mixes directly into the deaerator (at P_D) with
+    // no pump in between, it has to already be at or above deaerator pressure.
+    // unlike the checks above this is a plain comparison, no async call needed.
     const pcondMin = P_D + GAP / 1e3;
     if (P_condpump < pcondMin) {
       P_condpump = snap(pcondMin);
@@ -171,8 +164,8 @@
     return reasons;
   }
 
-  // Walks the chain from the moved slider, pushing neighbors just enough to
-  // restore ordering, clamped to each slider's own [min, max].
+  // walks the chain from the moved slider, pushes neighbors just enough to
+  // restore ordering, clamped to each slider's own min/max
   async function enforceOrder(changed: string) {
     const chain = getChain();
     const idx = chain.findIndex(([name]) => name === changed);
@@ -207,8 +200,8 @@
     }
   }
 
-  // Converts component state (MPa/kPa) to the solver's Pa/degC contract -
-  // T1/T3/T0 pass straight through since the solver takes °C directly.
+  // converts component state (MPa/kPa) to the solver's Pa/degC contract.
+  // T1/T3/T0 pass straight through since the solver takes degC directly.
   function params() {
     return {
       P1: P1 * 1e6, T1, T3, P2: P2 * 1e6, P4: P4 * 1e3, reheat_dP_pct,
@@ -217,21 +210,21 @@
       P_E: P_E * 1e3, P_F: P_F * 1e3, P_G: P_G * 1e3,
       P_condpump: P_condpump * 1e3, Q,
       eta_HP, eta_IP, eta_LP, eta_pump, eta_gen, TTD,
-      T0, RH, cw_approach, r_cw, UA: UA * 1e6,   // UA slider is MW/K -> W/K for the solver
+      T0, RH, cw_approach, r_cw, UA: UA * 1e6,   // UA slider is MW/K, solver wants W/K
       ...FIXED,
     };
   }
 
-  // Accordion open/closed state, one entry per slider group
+  // accordion open/closed state, one entry per slider group
   let openSections: Record<string, boolean> = $state({
     steam: false, extraction: false, efficiencies: false, cooling: false, stateVis: false,
   });
-  // Chevron points: right-pointing when closed, down-pointing when open.
+  // chevron points, right-pointing when closed, down-pointing when open
   function chevronPoints(open: boolean) {
     return open ? '2,3 5,7 8,3' : '3,2 7,5 3,8';
   }
 
-  // Extraction/drain state visibility toggles (X1/X2/X3, see NOTES.md)
+  // extraction/drain state visibility toggles (X1/X2/X3, see NOTES.md)
   let showExtraction: Record<string, boolean> = $state({
     A1: true, A2: true, A3: true, A4: true, A5: true,
     B1: true, B2: true, B3: true,
@@ -248,7 +241,7 @@
   let result  = $state<any>(null);
   let errMsg  = $state<string | null>(null);
 
-  // Solves off the main thread via the Worker (solverWorkerClient.js).
+  // solves off the main thread via the worker in solverWorkerClient.js
   async function runSolve() {
     try {
       result = await solveCycleAsync(params());
@@ -263,22 +256,22 @@
     runSolve();
   }
 
-  // TTD moves the P_C/P_G/P_E boundaries even without a pressure-slider edit.
+  // TTD moves the P_C/P_G/P_E boundaries even without a pressure slider edit
   async function onTTDChange() {
     const reasons = await enforceTTDBoundaries();
     if (reasons.length) flagOrder(reasons.join(' '));
     runSolve();
   }
 
-  // Condensate pump discharge pressure moves the same P_G (min) and P_E (max)
-  // boundaries TTD does, since both minPG and maxPE are functions of it.
+  // condensate pump discharge pressure moves the same P_G/P_E boundaries TTD
+  // does, since both minPG and maxPE are functions of it
   async function onCondPumpChange() {
     const reasons = await enforceTTDBoundaries();
     if (reasons.length) flagOrder(reasons.join(' '));
     runSolve();
   }
 
-  // Restores every slider to DEFAULTS.
+  // restores every slider to DEFAULTS
   function resetAll() {
     P1 = DEFAULTS.P1; T1 = DEFAULTS.T1; T3 = DEFAULTS.T3; P2 = DEFAULTS.P2; P4 = DEFAULTS.P4;
     reheat_dP_pct = DEFAULTS.reheat_dP_pct;
@@ -302,11 +295,11 @@
     runSolve();
   });
 
-  // Gauge values (geometry lives in Gauge.svelte)
+  // gauge values, geometry lives in Gauge.svelte
   const g1Val = $derived(result ? result.eta_1 : 0);
   const g2Val = $derived(result ? Math.min(result.eta_2, 1) : 0);
 
-  // x5 < 0 is CoolProp's superheated sentinel; treat as a full/best-case reading.
+  // x5 < 0 is CoolProp's superheated sentinel, treat as a full/best-case reading
   const g3Frac   = $derived(result ? (result.x5 >= 0 ? result.x5 : 1) : 0);
   const g3Warn   = $derived(!!result && result.x5 >= 0 && result.x5 < 0.85);
   const g3Accent    = $derived(g3Warn ? '#ff6459' : '#6fb2ee');
@@ -314,8 +307,8 @@
 
   const g4Raw    = $derived(result ? result.W_pumps / result.W_turb : 0);
 
-  // High condenser back-pressure (loss of vacuum) - 15 kPa is well above the ~5-10 kPa
-  // design range and roughly matches typical plant "high back pressure" alarm setpoints.
+  // high condenser back-pressure, loss of vacuum. 15 kPa is well above the ~5-10 kPa
+  // design range and roughly matches typical plant alarm setpoints
   const condWarn = $derived(!!result && result.P6 / 1000 > 15);
 
   // T-s diagram geometry
@@ -339,7 +332,7 @@
     return v != null ? v.toFixed(d) : '-';
   }
 
-  // Slider track-fill percentage, clamped to [0,100].
+  // slider track fill percentage, clamped to 0-100
   function pct(v: number, min: number, max: number) {
     return Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100));
   }
@@ -805,13 +798,9 @@
   }
   @media (max-width: 800px) { .rankine-wrap { grid-template-columns: 1fr; } }
 
-  /* Independent scroll panes: each column pins to the viewport top and scrolls
-     internally from there, so paging through sliders never carries the T-s
-     diagram/readouts out of view, and vice versa. A vertical seam down the
-     gap is the visual tell that these are two separate scroll regions, not
-     one long page. Both drop back to normal single-column page flow below
-     the breakpoint, where two independent scroll regions would just fight
-     the page's own scroll. */
+  /* independent scroll panes, each column pins to the viewport top and scrolls
+     internally so paging through sliders never carries the diagram out of view.
+     both drop back to normal page flow below the breakpoint. */
   .controls-col, .diagram-col {
     position: sticky;
     top: 16px;
@@ -841,7 +830,7 @@
     .controls-col { padding-right: 0; border-right: none; }
   }
 
-  /* Loading / error */
+  /* loading and error */
   .loading-state {
     grid-column: 1 / -1;
     display: flex; flex-direction: column; align-items: center;
@@ -853,13 +842,12 @@
     border-radius: 50%; animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  /* Stainless texture (not brushed aluminum) so the grain doesn't compete with the text. */
+  /* stainless texture, not brushed aluminum, so the grain doesn't compete with the text */
   .error-banner {
     grid-column: 1 / -1; padding: 12px 16px; color: var(--red-dim); font-size: 14px;
   }
   .error-banner::before { background-image: linear-gradient(165deg, var(--steel-650), var(--steel-800) 72%), var(--stainless); }
-  /* Fixed as a toast (not inline in controls-col) so it's visible regardless of
-     where the page is scrolled when an auto-clamp fires. */
+  /* fixed as a toast so it's visible regardless of scroll position when an auto-clamp fires */
   .order-warning {
     position: fixed;
     left: 50%;
@@ -879,7 +867,7 @@
     to   { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
 
-  /* Gauges */
+  /* gauges */
   .gauge-grid {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px;
   }
@@ -887,7 +875,7 @@
     .gauge-grid { grid-template-columns: repeat(2, 1fr); }
   }
 
-  /* Accordion slider groups - each a standalone chamfered instrument plate */
+  /* accordion slider groups, each a standalone chamfered instrument plate */
   .slider-details {
     margin-bottom: 12px;
   }
@@ -915,8 +903,8 @@
       0 0 0 1.5px var(--slider-glow-1, rgba(141, 150, 134, 0.55)),
       0 0 6px 2px var(--slider-glow-2, rgba(141, 150, 134, 0.85));
   }
-  /* Hover-only affordance glow, gated to real pointer devices: touchscreens have no true
-     hover-exit event, so a tap that closes the section would otherwise leave this "stuck" on. */
+  /* hover-only glow, gated to real pointer devices. touchscreens have no hover-exit
+     event, so a tap that closes the section would otherwise leave this stuck on. */
   @media (hover: hover) and (pointer: fine) {
     .details-summary:hover::before {
       background: var(--slider-color, #8d9686);
@@ -926,18 +914,15 @@
     }
     .details-summary:hover { color: var(--paper); }
   }
-  /* Chevron drawn as two stacked SVG strokes (grey behind, coloured on top) rather than a
-     rotated border-corner box with filter: drop-shadow() - that combination (filter applied
-     to a rotated, non-rectangular alpha shape) renders with a visible gap at the corner on
-     some real phone browsers. Plain SVG strokes don't have that failure mode, and swapping
-     the two points sets directly (open vs closed) sidesteps needing to animate a rotation. */
+  /* chevron drawn as two stacked svg strokes, not a rotated border-corner box with
+     filter drop-shadow, that combination renders with a visible gap on some phones. */
   .details-summary .chevron { flex-shrink: 0; margin-left: 8px; }
   .chevron-bg { fill: none; stroke: #6b7278; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
   .chevron-fg { fill: none; stroke: var(--slider-color, #8d9686); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .slider-open > .details-summary::after { transform: rotate(45deg); }
   .slider-body { padding: 2px 12px 14px; }
 
-  /* Emergent condenser metrics helper line under the cooling sliders */
+  /* emergent condenser metrics helper line under the cooling sliders */
   .cond-helper {
     font-family: var(--font-mono);
     font-size: 11px; font-weight: 700; line-height: 1.4; margin: 8px 0 0;
@@ -962,7 +947,7 @@
     font-variant-numeric: tabular-nums; min-width: 56px; text-align: right;
   }
 
-  /* Readout cards */
+  /* readout cards */
   .readout-grid {
     display: grid; grid-template-columns: repeat(4, 1fr);
     gap: 8px; margin-top: 14px; margin-bottom: 16px;
@@ -985,8 +970,8 @@
   .readout-value-alarm { color: var(--red-dim); font-weight: 700; }
   .readout-unit { font-family: var(--font-display); font-size: 11px; font-weight: 700; color: var(--ink-dim); }
 
-  /* .readout-card has clip-path (chamfered corners), which clips box-shadow too - the alarm
-     glow goes on this unclipped outer wrapper instead so it can bleed past the panel edges. */
+  /* readout-card's clip-path also clips box-shadow, so the alarm glow goes on this
+     unclipped wrapper instead so it can bleed past the panel edges */
   .readout-outer { border-radius: 8px; }
   .readout-alarm { animation: readout-alarm-glow 1s ease-in-out infinite; }
   @keyframes readout-alarm-glow {
@@ -994,7 +979,7 @@
     50%      { box-shadow: 0 0 26px 8px rgba(255, 61, 46, 1), 0 0 0 6px rgba(255, 61, 46, 0.18); }
   }
 
-  /* State table */
+  /* state table */
   .state-wrap { margin-bottom: 12px; padding: 12px 14px; overflow-x: auto; }
   .state-table {
     width: 100%; border-collapse: collapse; font-size: 13px; color: var(--paper);
@@ -1012,7 +997,7 @@
   .state-key { font-weight: 700; color: var(--amber-dim); }
   .state-key-drain { color: var(--blue); }
 
-  /* Diagram */
+  /* diagram */
   .diagram-title {
     font-size: 12px; font-weight: 700; color: var(--ink-dim);
     text-transform: uppercase; letter-spacing: 0.07em; margin: 0 0 8px;
@@ -1020,7 +1005,7 @@
   .scope-panel { padding: 14px; }
   .ts-svg { width: 100%; height: auto; display: block; overflow: visible; }
 
-  /* SVG classes */
+  /* svg classes */
   .axis      { stroke: var(--steel-900); stroke-width: 1; }
   .grid-line { stroke: rgba(0, 0, 0, 0.08); stroke-width: 1; }
   .axis-tick  { font-family: var(--font-mono); font-size: 11px; font-weight: 700; fill: var(--ink-dim); }
@@ -1040,7 +1025,7 @@
   .state-pt-ex    { fill: var(--amber); stroke: #000; stroke-width: 0.5; cursor: default; }
   .state-pt-drain { fill: var(--blue); stroke: #000; stroke-width: 0.5; cursor: default; }
 
-  /* State visibility accordion content */
+  /* state visibility accordion content */
   .selection-hint {
     font-size: 11.5px; font-weight: 700; color: var(--ink-dim); margin: 0 0 10px; line-height: 1.45;
   }
@@ -1062,21 +1047,21 @@
   .sel-dot {
     display: inline-block; width: 9px; height: 9px; border-radius: 0;
     background: var(--amber); border: 1px solid #000; flex-shrink: 0;
-    /* Solid ring + soft halo - a plain blur glow doesn't read on this light background. */
+    /* solid ring plus soft halo, a plain blur glow doesn't read on this light background */
     box-shadow: 0 0 0 1.5px rgba(242, 172, 65, 0.55), 0 0 7px 3px rgba(242, 172, 65, 0.85);
   }
   .sel-dot-drain {
     background: var(--blue);
     box-shadow: 0 0 0 1.5px rgba(111, 178, 238, 0.55), 0 0 7px 3px rgba(111, 178, 238, 0.85);
   }
-  /* Deselected: lit indicator goes dark, like an unpowered LED - no glow, no color. */
+  /* deselected, lit indicator goes dark like an unpowered led, no glow, no color */
   .sel-dot-off {
     background: #9a9d9a;
     box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.15);
   }
   .sel-label { flex: 1; }
 
-  /* Legend */
+  /* legend */
   .diagram-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 9px; }
   .leg {
     font-size: 12px; font-weight: 700; color: var(--ink-dim);
@@ -1100,7 +1085,7 @@
     flex-wrap: wrap;
   }
 
-  /* Page title with reactive supercritical strikethrough */
+  /* page title with reactive supercritical strikethrough */
   .page-title {
     font-family: var(--font-display);
     font-size: 24px; font-weight: 700; color: var(--paper);
@@ -1108,9 +1093,8 @@
     margin: 0 0 16px; line-height: 1.3;
   }
 
-  /* One-click way back to a known-good cycle after e.g. dragging efficiencies to
-     unrealistic extremes - same chamfered-metal chrome as every other panel, but sized
-     and colored (teal on hover, matching the nav's current-page/click glow) like a button. */
+  /* one-click way back to a known-good cycle. same chamfered metal chrome as every
+     other panel, sized and colored like a button. */
   .reset-btn {
     margin-bottom: 16px;
     padding: 8px 16px;

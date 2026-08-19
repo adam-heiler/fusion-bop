@@ -1,52 +1,49 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  // Diffusion / entropy sandbox. A hot block (dense dots, bottom-middle) sits in
-  // a cold container (sparse dots elsewhere); every step each dot random-walks
-  // one cell or stays. Left = exact dot positions (a microstate); right = the
-  // nine section densities in dots-per-square (the macrostate); bottom = the
-  // Boltzmann entropy S = k ln W of that macrostate, step by step.
+  // diffusion / entropy sandbox. a hot block (dense dots, bottom-middle) sits in
+  // a cold container (sparse dots elsewhere), every step each dot random-walks
+  // one cell or stays. left = exact dot positions (microstate), right = the
+  // nine section densities (macrostate), bottom = boltzmann entropy over time.
 
-  // --- Grid geometry ---
-  // Fine simulation grid (90x90): a dot must walk ~30 cells to cross a section
-  // boundary, so the macrostate takes many steps to even out. The drawn grid is
-  // the same 90x90 the dots actually move on.
+  // grid geometry. fine simulation grid is 90x90, a dot walks ~30 cells to cross
+  // a section boundary, so the macrostate takes many steps to even out.
   const SECTIONS = 3;
   const CELLS = 30;
   const FINE = SECTIONS * CELLS; // 90
-  const LCELL = 8;               // svg units per cell (left grid)
+  const LCELL = 8;               // svg units per cell, left grid
   const LVB = FINE * LCELL;      // 720
   const DOT_R = 3.4;
 
-  // --- Dot budget ---
+  // dot budget
   const DENSE = 280;
   const SPARSE = 15;
   const TOTAL = DENSE + SPARSE * 8; // 400 energy quanta
   const UNIFORM = TOTAL / 9;
-  const DPS_MID = Math.round(DENSE / 2); // key midpoint (linear: half of DENSE)
-  const DPS_MAX = DENSE;                  // key top (the initial hot-block density)
+  const DPS_MID = Math.round(DENSE / 2); // key midpoint, half of DENSE
+  const DPS_MAX = DENSE;                  // key top, initial hot-block density
 
-  // ln(k!) table so W = TOTAL! / prod(n_i!) is a subtraction.
+  // ln(k!) table so W = TOTAL! / prod(n_i!) is a subtraction
   const LNFACT = (() => {
     const a = new Float64Array(TOTAL + 1);
     for (let k = 2; k <= TOTAL; k++) a[k] = a[k - 1] + Math.log(k);
     return a;
   })();
 
-  // Entropy floor (peaked start) and ceiling (uniform-as-possible), in units of k.
+  // entropy floor (peaked start) and ceiling (uniform as possible), in units of k
   const S_MIN = LNFACT[TOTAL] - (LNFACT[DENSE] + 8 * LNFACT[SPARSE]);
   const S_MAX = (() => {
     const q = Math.floor(TOTAL / 9), r = TOTAL % 9;
     return LNFACT[TOTAL] - (r * LNFACT[q + 1] + (9 - r) * LNFACT[q]);
   })();
 
-  // --- State ---
+  // state
   let dots = $state<Array<{ x: number; y: number }>>([]);
   let playing = $state(false);
   let speed = $state(40);   // steps per second
   let steps = $state(0);
 
-  // Entropy history lives in a plain array (cheap to append); a reactive length
+  // entropy history lives in a plain array, cheap to append. a reactive length
   // counter drives the graph so we never rebuild a growing reactive array.
   const histArr: number[] = [];
   let histLen = $state(0);
@@ -116,8 +113,8 @@
     histLen = 1;
   });
 
-  // requestAnimationFrame loop, running multiple steps per frame so the speed
-  // isn't capped by the browser's minimum timer interval.
+  // requestAnimationFrame loop, runs multiple steps per frame so speed isn't
+  // capped by the browser's minimum timer interval
   let rafId = 0;
   let accum = 0;
   let lastT = 0;
@@ -141,16 +138,15 @@
     return () => { if (rafId) cancelAnimationFrame(rafId); rafId = 0; };
   });
 
-  // --- Density color: diverging scale centered on the equilibrium DPS ---
-  // Linear scale in DPS (frac = n / DENSE), so a section's color sits at its
-  // true position from 0 to DENSE. The white band lands where the average DPS
-  // (~UNIFORM / DENSE of the way along, near the low end) actually is - not
-  // forced to the middle - and the hot end deepens to a dark red at DENSE.
+  // density color, diverging scale centered on the equilibrium dps.
+  // linear scale in dps (frac = n / DENSE), so a section's color sits at its
+  // true position from 0 to DENSE. white band lands where the average dps
+  // actually is, not forced to the middle, hot end deepens to dark red at DENSE.
   const STOPS: Array<[number, [number, number, number]]> = [
     [0.0, [38, 96, 158]],     // deep cold
     [0.05, [111, 178, 238]],  // blue
-    [0.10, [223, 226, 229]],  // near-white (band start, ~28 DPS)
-    [0.22, [223, 226, 229]],  // near-white (band end, ~62 DPS; average ~44 sits inside)
+    [0.10, [223, 226, 229]],  // near-white, band start ~28 dps
+    [0.22, [223, 226, 229]],  // near-white, band end ~62 dps, average ~44 sits inside
     [0.35, [242, 172, 65]],   // amber
     [0.55, [224, 68, 52]],    // red
     [1.0, [140, 22, 18]],     // deep dark red at DENSE
@@ -173,7 +169,7 @@
   const textColor = (rgb: [number, number, number]) =>
     0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2] < 150 ? '#f4f6f5' : '#1c2023';
 
-  // --- Entropy graph geometry ---
+  // entropy graph geometry
   const GW = 720, GH = 210, GL = 58, GR = 16, GT = 14, GB = 32;
   const PLOTW = GW - GL - GR, PLOTH = GH - GT - GB;
   const yLo = S_MIN - (S_MAX - S_MIN) * 0.06;
@@ -181,7 +177,7 @@
   const xFor = (i: number, m: number) => GL + (i / m) * PLOTW;
   const yFor = (v: number) => GT + (1 - (v - yLo) / (yHi - yLo)) * PLOTH;
 
-  // Curve rebased on history length (never squishes), decimated to ~1200 verts.
+  // curve rebased on history length so it never squishes, decimated to ~1200 verts
   const curve = $derived.by(() => {
     const n = histLen;
     if (n < 2) return '';
@@ -276,7 +272,7 @@
         <line class="g-axis" x1={GL} y1={GT + PLOTH} x2={GW - GR} y2={GT + PLOTH} />
 
         <line class="g-ceiling" x1={GL} y1={yFor(S_MAX)} x2={GW - GR} y2={yFor(S_MAX)} />
-        <text class="g-ceiling-label" x={GW - GR} y={yFor(S_MAX) - 5} text-anchor="end">S_max (equilibrium)</text>
+        <text class="g-ceiling-label" x={GW - GR} y={yFor(S_MAX) - 5} text-anchor="end">S<tspan class="sub" dy="2.5">max</tspan><tspan dy="-2.5"> (equilibrium)</tspan></text>
 
         {#if curve}
           <polyline class="g-curve" points={curve} />
@@ -299,7 +295,7 @@
       <p class="readout-value">{steps}</p>
     </div>
     <div class="readout-card chamfer-panel chamfer-sm">
-      <p class="readout-label">Entropy S = k&middot;lnW</p>
+      <p class="readout-label">Entropy S = k&middot;ln W</p>
       <p class="readout-value">{fmt(entropy, 1)} <span class="readout-unit">k</span></p>
     </div>
     <div class="readout-card chamfer-panel chamfer-sm">
@@ -367,7 +363,7 @@
   .frame { fill: none; stroke: var(--ink); stroke-width: 2.4; }
   .dot { fill: #e0742a; fill-opacity: 0.85; }
 
-  /* DPS tiles: flat density-color fills, square corners, thin dark seam. */
+  /* dps tiles, flat density color fills, square corners, thin dark seam */
   .dps-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -411,6 +407,7 @@
   .g-axis { stroke: var(--steel-900); stroke-width: 1.2; }
   .g-ceiling { stroke: var(--teal-dim); stroke-width: 1.4; stroke-dasharray: 5 4; opacity: 0.75; }
   .g-ceiling-label { font-family: var(--font-mono); font-size: 11px; font-weight: 700; fill: var(--teal-dim); }
+  .g-ceiling-label .sub { font-size: 0.75em; }
   .g-curve { fill: none; stroke: var(--amber-dim); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
   .g-head { fill: var(--amber); stroke: var(--amber-dim); stroke-width: 1; }
   .g-axis-label { font-family: var(--font-mono); font-size: 11px; font-weight: 700; fill: var(--ink-dim); }

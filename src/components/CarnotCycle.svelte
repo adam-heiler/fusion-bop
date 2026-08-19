@@ -1,12 +1,12 @@
 <script lang="ts">
   import Gauge from './Gauge.svelte';
-  // Carnot cycle interactive explainer. Formula sources: NOTES.md.
+  // carnot cycle interactive explainer, formulas in NOTES.md
 
   let TH = $state(800); // hot reservoir temperature, K
   let TC = $state(300); // cold reservoir temperature, K
   const QH = 100; // heat input, kJ (fixed reference value)
 
-  // Guard: TC must stay strictly below TH for a valid heat engine.
+  // TC must stay strictly below TH for a valid heat engine
   function clampTC(value: number) {
     return value >= TH ? TH - 10 : value;
   }
@@ -20,7 +20,7 @@
   const exIn = $derived(QH * (1 - TC / TH)); // exergy in, kJ (T0 = TC)
   const deltaT = $derived(TH - TC); // temperature difference, K
 
-  // --- T-s diagram geometry ---
+  // t-s diagram geometry
   const padL = 50, padR = 300, padT = 20, padB = 220;
   const Tmin = 200, Tmax = 1250;
   const s1 = 86, s2 = 210, s3 = 210, s4 = 86; // fixed entropy positions for the four corners
@@ -180,9 +180,8 @@
   .controls-col,
   .diagram-col {
     font-family: var(--font-display);
-    /* Overrides the grid item default of min-width: auto (content's
-       min-content size) - without it, a wide child can force even a bare
-       1fr track past its container at narrow viewports. */
+    /* overrides the grid item default min-width auto, otherwise a wide child
+       can force the 1fr track past its container at narrow viewports. */
     min-width: 0;
   }
 
