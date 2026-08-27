@@ -1,5 +1,4 @@
-// Runs the CO2 Brayton solver off the main thread, same pattern as
-// rankineSolver.worker.js (see NOTES.md, "Worker offload").
+// Runs the CO2 Brayton solver off the main thread, same pattern as rankineSolver.worker.js (see NOTES.md, "Worker offload").
 import { init, solveCycle, getDome } from './co2BraytonSolver.js';
 
 self.onmessage = async (e) => {

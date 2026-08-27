@@ -1,13 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  // diffusion / entropy sandbox. a hot block (dense dots, bottom-middle) sits in
-  // a cold container (sparse dots elsewhere), every step each dot random-walks
-  // one cell or stays. left = exact dot positions (microstate), right = the
-  // nine section densities (macrostate), bottom = boltzmann entropy over time.
+  // diffusion sandbox: dots random-walk from a hot block toward uniform density, tracking boltzmann entropy
 
-  // grid geometry. fine simulation grid is 90x90, a dot walks ~30 cells to cross
-  // a section boundary, so the macrostate takes many steps to even out.
+  // 90x90 grid, ~30 cells per section so the macrostate takes many steps to even out
   const SECTIONS = 3;
   const CELLS = 30;
   const FINE = SECTIONS * CELLS; // 90
@@ -43,8 +39,7 @@
   let speed = $state(40);   // steps per second
   let steps = $state(0);
 
-  // entropy history lives in a plain array, cheap to append. a reactive length
-  // counter drives the graph so we never rebuild a growing reactive array.
+  // plain array for cheap appends; a reactive length counter drives the graph instead
   const histArr: number[] = [];
   let histLen = $state(0);
 
@@ -113,8 +108,7 @@
     histLen = 1;
   });
 
-  // requestAnimationFrame loop, runs multiple steps per frame so speed isn't
-  // capped by the browser's minimum timer interval
+  // multiple steps per frame so speed isn't capped by the browser's minimum timer interval
   let rafId = 0;
   let accum = 0;
   let lastT = 0;
@@ -138,10 +132,7 @@
     return () => { if (rafId) cancelAnimationFrame(rafId); rafId = 0; };
   });
 
-  // density color, diverging scale centered on the equilibrium dps.
-  // linear scale in dps (frac = n / DENSE), so a section's color sits at its
-  // true position from 0 to DENSE. white band lands where the average dps
-  // actually is, not forced to the middle, hot end deepens to dark red at DENSE.
+  // diverging color scale in dps, white band centered on actual average rather than the midpoint
   const STOPS: Array<[number, [number, number, number]]> = [
     [0.0, [38, 96, 158]],     // deep cold
     [0.05, [111, 178, 238]],  // blue
@@ -315,23 +306,19 @@
     flex-wrap: wrap;
     margin-bottom: 20px;
   }
+  /* hover/active chrome comes from the shared button.chamfer-panel rules in global.css */
   .ctrl-btn {
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    padding: 8px 15px;
+    padding: 8px 16px;
     font-family: var(--font-display);
     font-size: 0.85rem;
     font-weight: 700;
     letter-spacing: 0.03em;
-    color: var(--ink);
-    cursor: pointer;
     border: none;
-    transition: color 0.15s ease, transform 0.15s ease, filter 0.15s ease;
   }
   .ctrl-btn svg { fill: currentColor; flex-shrink: 0; }
-  .ctrl-btn:hover { color: var(--teal-dim); filter: brightness(1.08); }
-  .ctrl-btn:active { transform: translateY(1px); filter: brightness(0.94); }
 
   .speed-ctrl { flex: 1; min-width: 180px; max-width: 320px; }
   .speed-label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }

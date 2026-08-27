@@ -6,8 +6,7 @@ const BAR = 1e5;
 
 let CP = null;
 
-// Per-solve memoization of CoolProp lookups, same scheme as rankineSolver.js
-// / co2BraytonSolver.js.
+// Per-solve memoization of CoolProp lookups, same scheme as rankineSolver.js / co2BraytonSolver.js.
 let _qCache = new Map();
 function _qkey(out, n1, v1, n2, v2) { return out + '|' + n1 + v1 + '|' + n2 + v2; }
 
@@ -16,9 +15,7 @@ export async function init() {
   CP = await CoolPropModule();
 }
 
-// No saturation dome: helium's critical point (~-268°C, 0.23 MPa) sits far
-// outside this cycle's entire T/P range, so the working fluid is single-phase
-// (ideal-gas-like) everywhere on the diagram - there's nothing to draw.
+// No saturation dome: helium's critical point (~-268°C, 0.23 MPa) is far outside this cycle's range, so nothing to draw.
 
 function Q(out, n1, v1, n2, v2) {
   const k = _qkey(out, n1, v1, n2, v2);
@@ -29,8 +26,7 @@ function Q(out, n1, v1, n2, v2) {
   return val;
 }
 
-// Water cp/density for the circulating-water loop (precooler + intercooler
-// cold side, one combined loop per the site's he-brayton.csv note).
+// Water cp/density for the circulating-water loop (precooler + intercooler cold side, one combined loop per he-brayton.csv).
 function QW(out, n1, v1, n2, v2) {
   const k = 'W' + _qkey(out, n1, v1, n2, v2);
   const hit = _qCache.get(k);
@@ -95,55 +91,14 @@ function turbSeg(s_in, P_in, s_out, P_out, N) {
   return pts;
 }
 
-// Single-shaft recuperated Brayton cycle with two-stage intercooled
-// compression. State numbering follows the site's he-brayton.csv exactly:
-// 1 SHX->turbine, 2 turbine->regenerator (hot in), 3 regenerator (hot out)
-// ->precooler, 4 precooler->main compressor (C1), 5 C1->intercooler,
-// 6 intercooler->aux compressor (C2), 7 C2->regenerator (cold in),
-// 8 regenerator (cold out)->SHX. Unlike the CO2 cycle there's no
-// recompression split - a single mass flow runs the whole loop, so the
-// regenerator's hot and cold inlet states are both already fully determined
-// before its energy balance runs: no fixed-point iteration needed.
-//
-// Validated against the ARC study (sustainability-16-07480, Tables 13/14):
-// at the paper's own exact per-state pressures, individual states match
-// Table 14 almost to the kJ/kg (e.g. h5 = 1991.9 exact at P4 = 22.5 bar,
-// eta_comp = 0.9), confirming the underlying CoolProp Helium properties
-// agree with the paper's NASA thermodynamic data.
-//
-// Unlike co2BraytonSolver.js (which holds three constant pressure levels for
-// its whole loop, no HX drops modeled at all), this solver models exactly
-// one HX pressure drop: regen_dP_pct, applied as a % of each side's own
-// local pressure across the regenerator only (SHX and precooler/intercooler
-// stay drop-free). That one component turned out to matter far more here
-// than any HX drop does for CO2: helium's compressors run a low enough
-// pressure ratio that isentropic compression work is unusually sensitive to
-// a couple of percent of inlet pressure (dh ~ T*ds, and ds from a 2%
-// pressure shift is not negligible at these temperatures), and the paper's
-// own regenerator drop feeds directly into the main compressor's inlet
-// pressure via the precooler. With regen_dP_pct at its default 3.5%, this
-// solver reproduces essentially every headline number simultaneously:
-// 207.0 MW net (paper 207.5), 32.1% net efficiency (paper 32%), 88.4% gross
-// efficiency (paper 88%), 63.3% back-work ratio (paper 63.5%) - a much
-// tighter match than the flat-pressure version this replaced (which ran
-// ~240 MW / 37% net at equivalent slider settings). eps_regen = 0.90 is
-// chosen separately, to match the paper's actual hot/cold regenerator
-// duties directly (states 2/3/7/8).
+// Single-shaft recuperated Brayton, two-stage intercooled compression, states per he-brayton.csv; no recompression split so regenerator inlets are already known (no fixed-point iteration needed); regen_dP_pct is the one HX drop modeled since helium's low compressor pressure ratio makes compression work unusually sensitive to inlet pressure; validated against the ARC study (sustainability-16-07480, Tables 13/14), matching headline net power/efficiency/back-work ratio within ~1%.
 export function solveCycle(p) {
   _qCache.clear();
   const warnings = [];
 
   const P_hi = p.P_high, P_mid = p.P_mid, P_lo = p.P_low;
 
-  // Regenerator pressure drop: the one HX drop this solver models (see
-  // heBraytonSolver.js's file-header note on why the others are left flat).
-  // Applied as a % of each side's own local pressure - one slider covers
-  // both sides, since the ARC study's own state table shows a similarly-
-  // sized drop on each (state 2->3 and state 7->8). P_hi/P_lo stay anchored
-  // to the compressor discharge / turbine exhaust (the actual GateCycle
-  // input values, Table 13); the SHX and precooler are still modeled as
-  // drop-free, so state 1 sits at the same (reduced) pressure as state 8,
-  // and state 4 at the same (reduced) pressure as state 3.
+  // Regenerator pressure drop, the one HX drop modeled (see file header); one slider for both sides since ARC's table shows similar drops on each; P_hi/P_lo stay anchored to compressor discharge/turbine exhaust (GateCycle Table 13), SHX/precooler stay drop-free.
   const dP = p.regen_dP_pct;
   const P_hi_out = P_hi * (1 - dP);  // states 1 & 8
   const P_lo_out = P_lo * (1 - dP);  // states 3 & 4
@@ -178,12 +133,7 @@ export function solveCycle(p) {
   const T7K = Q('T', 'P', P_hi, 'H', h7);
   const s7 = Q('S', 'P', P_hi, 'H', h7);
 
-  // Regenerator: hot side 2->3 (P_lo -> P_lo_out), cold side 7->8
-  // (P_hi -> P_hi_out). Enthalpy-based effectiveness (see NOTES.md,
-  // co2BraytonSolver.js section) - both inlet states are already known, so
-  // this is a direct calculation, not an iteration. The "max possible"
-  // counterfactual states are evaluated at each stream's own outlet
-  // pressure, consistent with where Qregen ultimately lands it.
+  // Regenerator, hot side 2->3, cold side 7->8; enthalpy-based effectiveness (see NOTES.md, co2BraytonSolver.js section), inlets already known so direct calc, not iteration.
   const QmaxHot = h2 - Q('H', 'P', P_lo_out, 'T', T7K);
   const QmaxCold = Q('H', 'P', P_hi_out, 'T', T2K) - h7;
   const Qregen = p.eps_regen * Math.max(0, Math.min(QmaxHot, QmaxCold));
@@ -209,37 +159,49 @@ export function solveCycle(p) {
   const Q_pc = m * (h3 - h4);
   const Q_itc = m * (h5 - h6);
 
-  // Combined circulating-water loop (precooler + intercooler branches
-  // recombine before the cooling tower, per he-brayton.csv's note on state 3).
+  // Combined circulating-water loop, precooler + intercooler branches recombine before the cooling tower (he-brayton.csv note on state 3).
   const cp_cw = QW('CPMASS', 'P', 1.5 * BAR, 'T', (T_cw_in + p.cw_range / 2) + C2K);
   const mdot_cw = (Q_pc + Q_itc) / (cp_cw * p.cw_range);
   const T_cw_out = T_cw_in + p.cw_range;
 
-  // Incompressible ṁ·ΔP/(ρ·η) form - see co2BraytonSolver.js for why this is
-  // used instead of an H(P,S) lookup (fails near 0°C water).
+  // Incompressible ṁ·ΔP/(ρ·η) form instead of H(P,S) lookup, which fails near 0°C water (see co2BraytonSolver.js).
   const P_cw_lo = 1.5 * BAR, dP_cw = 2 * BAR;
   const rho_cw = QW('D', 'P', P_cw_lo, 'T', T_cw_in + C2K);
   const W_cwpump = mdot_cw * dP_cw / (rho_cw * p.eta_comp);
 
-  // Gross/net power follow Section 2.4's formula (validated against the
-  // ARC study's Table 15/17: reproduces 568.3 MW gross / 207.5 MW net /
-  // 88.0% gross eff / 32% net eff at the paper's own inputs to within ~1%).
+  // Gross/net power per Section 2.4's formula; validated against ARC study Table 15/17 within ~1%.
   const W_gross = W_turb * p.eta_gen;
   const W_net = (W_turb - W_comp) * p.eta_gen - W_cwpump;
   const eta_1 = W_net / Qdot;
   const eta_gross = W_gross / Qdot;
 
-  // 2nd law (exergetic) efficiency: flow-exergy increase across the SHX.
+  // 2nd law (exergetic) efficiency. Ex_gas is the flow-exergy the helium
+  // itself gains across the SHX - a legitimate quantity, but scoped only to
+  // the gas side, so it can't see how irreversibly that heat was actually
+  // transferred in. Ex_source instead prices the same duty against the
+  // intermediate loop's own temperature glide (the solar-salt loop from the
+  // plant diagram, same 565/505 C supply/return as the Rankine cycle - single
+  // pass here, no reheat, so the full duty runs the whole 565->505 C - see
+  // NOTES.md). See rankineSolver.js for the full derivation - Ex_source =
+  // Qdot*(1 - T0/T_lm), independent of every gas-side slider, so eta_2 can't
+  // be gamed by changing how the helium arrives at the SHX the way a
+  // gas-side-only reference could be.
   const T0K = p.T0 + C2K;
-  const Ex_in = m * ((h1 - h8) - T0K * (s1 - s8));
-  const eta_2 = W_net / Ex_in;
+  const T_SOURCE_IN = 565 + C2K;
+  const T_SOURCE_OUT = 505 + C2K;
+  const T_lm_source = (T_SOURCE_IN - T_SOURCE_OUT) / Math.log(T_SOURCE_IN / T_SOURCE_OUT);
+  const Ex_source = Qdot * (1 - T0K / T_lm_source);
+
+  const Ex_gas = m * ((h1 - h8) - T0K * (s1 - s8));
+  const eta_2 = W_net / Ex_source;
+  const Irr_shx = Ex_source - Ex_gas;  // exergy destroyed transferring heat into the helium itself
+  const Irr_cycle = Ex_gas - W_net;    // exergy destroyed downstream (turbine, compressors, regenerator, precooler/intercooler)
+  const Irr = Ex_source - W_net;       // total exergy destroyed, consistent with eta_2 (Irr_shx + Irr_cycle)
 
   const bwr = W_comp / W_turb;                           // back-work ratio
   const regen_share = Qregen / (Qregen + (h1 - h8));      // per unit mass
 
-  // T-s diagram paths. The regenerator legs are no longer isobaric once
-  // regen_dP_pct > 0 (each side's inlet/outlet pressure now differ), so
-  // those two use seg() (geometric P interpolation) instead of iso().
+  // T-s diagram paths; regenerator legs use seg() (geometric P interpolation) not iso() since they're no longer isobaric once regen_dP_pct > 0.
   const shxPath      = iso(P_hi_out, h8, h1, 30);
   const turbPath      = turbSeg(s1, P_hi_out, s2, P_lo, 16);
   const regenHotPath  = seg(h2, P_lo, h3, P_lo_out, 14);
@@ -282,7 +244,8 @@ export function solveCycle(p) {
     warnings, m,
     W_net, W_turb, W_comp, W_C1, W_C2, W_gross, W_cwpump,
     eta_1, eta_2, eta_gross, bwr, regen_share,
-    Q_pc, Q_itc, Q_regen: m * Qregen, Ex_in,
+    Q_pc, Q_itc, Q_regen: m * Qregen,
+    Ex_source, Ex_gas, Irr, Irr_shx, Irr_cycle,
     T_wb, T_cw_in, T_cw_out, mdot_cw, T4, T6,
     statePoints, stateTable,
     shxPath, turbPath, regenHotPath, precoolPath, c1Path, itcPath, c2Path, regenColdPath,

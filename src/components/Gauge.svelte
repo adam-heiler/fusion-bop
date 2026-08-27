@@ -1,6 +1,5 @@
 <script lang="ts">
-  // reusable analog instrument gauge with lcd readout.
-  // semicircular sweep, 0% at left (180deg) to 100% at right (0deg), over the top.
+  // semicircular sweep, 0% at left (180deg) to 100% at right (0deg), over the top
   let {
     value,
     label,
@@ -10,6 +9,7 @@
     accentDim = '#c07a10',
     warn = false,
     dangerBelow = null,
+    title = undefined,
   }: {
     value: number;
     label: string;
@@ -20,6 +20,8 @@
     warn?: boolean;
     /** draws a red hazard band from 0 up to this fraction, e.g. a low-quality cutoff */
     dangerBelow?: number | null;
+    /** native hover tooltip, e.g. to flag an assumption behind the reading */
+    title?: string;
   } = $props();
 
   // per-instance id suffix so multiple gauges don't collide over defs ids
@@ -70,7 +72,7 @@
   });
 </script>
 
-<div class="gauge-outer" class:gauge-alarm={warn}>
+<div class="gauge-outer" class:gauge-alarm={warn} {title}>
 <div class="gauge-widget chamfer-panel chamfer-sm">
   <p class="gauge-label">{label}</p>
   <svg viewBox="-12 0 184 112" class="gauge-svg">
@@ -175,8 +177,7 @@
     transform-origin: 80px 92px;
   }
 
-  /* gauge-widget's clip-path also clips box-shadow, so an alarm glow on it would
-     get cut off at the corners. applied to this unclipped wrapper instead. */
+  /* gauge-widget's clip-path also clips box-shadow, so the alarm glow lives on this unclipped wrapper instead */
   .gauge-outer { border-radius: 8px; }
   .gauge-alarm {
     animation: gauge-alarm-glow 1s ease-in-out infinite;

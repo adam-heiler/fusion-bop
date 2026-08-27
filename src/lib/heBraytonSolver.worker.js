@@ -1,6 +1,4 @@
-// Runs the He Brayton solver off the main thread, same pattern as
-// rankineSolver.worker.js / co2BraytonSolver.worker.js (see NOTES.md,
-// "Worker offload").
+// Runs the He Brayton solver off the main thread, same pattern as rankineSolver.worker.js / co2BraytonSolver.worker.js (see NOTES.md, "Worker offload").
 import { init, solveCycle } from './heBraytonSolver.js';
 
 self.onmessage = async (e) => {

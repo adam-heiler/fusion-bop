@@ -3,12 +3,69 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import HeBraytonCycle from '../components/HeBraytonCycle.svelte';
 ---
 <BaseLayout title="He Brayton">
-  <div class="page-container">
-    <h2 class="page-title">He Brayton Cycle</h2>
+  <section class="he-hero">
+    <div class="he-align">
+      <div class="title-row">
+        <svg class="molecule" aria-hidden="true" viewBox="0 0 30 30"><defs><pattern id="mol-knob-tex" patternUnits="objectBoundingBox" patternContentUnits="objectBoundingBox" width="1" height="1"><image href="/buttons/knob-silver.png" x="0" y="0" width="1" height="1" preserveAspectRatio="xMidYMid slice"/></pattern></defs><ellipse class="mol-orbit" cx="15" cy="15" rx="14" ry="5" transform="rotate(30 15 15)"/><ellipse class="mol-orbit" cx="15" cy="15" rx="14" ry="5" transform="rotate(-30 15 15)"/><circle class="mol-he" cx="15" cy="15" r="9"/><circle class="mol-he-tint" cx="15" cy="15" r="9"/><text class="mol-label mol-label-he" x="15" y="15">He</text></svg>
+        <h2 class="page-title">Closed-Loop Helium Brayton Cycle</h2>
+      </div>
+      <div class="scroll-hint">
+        <span>Scroll for simulator</span>
+        <svg class="scroll-hint-arrow" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <polyline points="3,6 8,11 13,6" />
+        </svg>
+      </div>
+      <div class="cycle-intro">
+        <p>
+          Helium is the other common choice for a closed Brayton power cycle, and for a
+          very different reason than CO<sub>2</sub>'s density trick: it's chemically inert.
+          It won't corrode piping, react with a blanket coolant leak, or become activated
+          the way some other candidate fluids can, which matters a lot when the heat source
+          is a fusion blanket. The tradeoff is that helium behaves like a genuinely ideal
+          gas across the whole cycle, no critical-point density boost to shrink the
+          compressors, so a helium Brayton cycle needs real compression-work management
+          instead.
+        </p>
+        <p>
+          <strong>Intercooling</strong> is that management. Compression happens in two
+          stages with an intercooler in between: a main compressor (C1) takes a first
+          pressure bite, the gas is cooled back down close to ambient in an intercooler,
+          and an auxiliary compressor (C2) finishes the job. Splitting the compression and
+          cooling the gas in the middle keeps each stage's compression work down (cooler
+          gas is denser, denser gas is cheaper to compress), the same logic multistage
+          intercooled air compressors use, just applied to a closed helium loop instead.
+        </p>
+        <p>
+          <strong>Regeneration</strong> here is a single stage, not split into
+          high-/low-temperature recuperators the way the CO<sub>2</sub> cycle needs. That's
+          a direct consequence of helium being close to an ideal gas: its specific heat
+          barely changes with temperature, so there's no sharp mismatch between the hot
+          and cold streams for one recuperator to struggle with. Downstream of the turbine,
+          it simply preheats the compressor discharge with turbine exhaust heat before the
+          gas heads back to the Secondary HTX.
+        </p>
+        <p>
+          The turbine inlet here draws from the same solar-salt intermediate loop and
+          Secondary HTX as the other two cycles on this site, 565 °C supply from the same
+          blanket-fed loop, so all three cycles are drawing on a shared, citable heat
+          source rather than three unrelated assumptions.
+        </p>
+      </div>
+    </div>
+  </section>
+  <div class="hero-bottom-bar"></div>
+  <div class="he-align diagram-title-row">
+    <h3 class="page-title">Closed-Loop Helium Brayton Cycle Diagram</h3>
   </div>
   <div class="page-breakout">
     <img class="cycle-diagram diagram-he" src="/diagrams/fusion-he-brayton.png" alt="Process flow diagram of the closed-loop helium Brayton cycle balance of plant" width="1667" height="755" />
   </div>
+  <p class="he-align diagram-credit">
+    Cycle layout adapted from
+    Colliva, F.; Ciurluini, C.; Iaboni, A.; Centomani, G.V.; Trotta, A.; Giannetti, F.
+    "Analysis of Power Conversion System Options for ARC-like Tokamak Fusion Reactor
+    Balance of Plant." <em>Sustainability</em> <strong>2024</strong>, <em>16</em>, 7480. <a href="https://doi.org/10.3390/su16177480" target="_blank" rel="noopener noreferrer">doi.org/10.3390/su16177480</a>
+  </p>
   <div class="simulator-box chamfer-panel chamfer-all">
     <!-- plain div, not HeBraytonCycle directly. astro's own astro-island wrapper
          is display:contents, so chamfer-panel's z-index promotion no-ops on it. -->
@@ -19,4 +76,133 @@ import HeBraytonCycle from '../components/HeBraytonCycle.svelte';
 <style>
   /* see co2-brayton.astro, same native-resolution scale factor. */
   .diagram-he { max-width: 1059px; }
+
+  .he-align {
+    max-width: 1028px;
+    margin: 0 auto;
+  }
+
+  /* full-bleed teal-fade hero, same recipe as the rankine page */
+  .he-hero {
+    position: relative;
+    overflow: hidden;
+    margin: -24px -24px 0;
+    padding: 40px max(24px, calc(50vw - 640px)) 32px;
+    background-image:
+      linear-gradient(180deg, rgba(53, 214, 180, 0.11), rgba(53, 214, 180, 0) 88%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 42%),
+      linear-gradient(163deg, var(--steel-300), var(--steel-500) 85%);
+    background-blend-mode: normal;
+    background-size: cover;
+    background-position: center;
+  }
+
+  /* decorative single helium atom flanking the title: one knob-textured sphere
+     with two thin decorative orbit rings, same knob-texture/teal-wash
+     construction as the other two cycle pages' molecule icons. title-row is a
+     positioning anchor: the atom is absolutely positioned into the left
+     margin so it never shifts the title text, which stays flush with the
+     same left edge as the rest of the page. */
+  .title-row {
+    position: relative;
+  }
+  .title-row .page-title {
+    font-size: 30px;
+  }
+  .molecule {
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-right: 14px;
+    width: 90px;
+    height: auto;
+    opacity: 0.95;
+  }
+  @media (max-width: 1220px) {
+    .molecule { display: none; }
+  }
+  .molecule .mol-orbit { fill: none; stroke: var(--teal-dim); stroke-width: 1; opacity: 0.55; }
+  .molecule .mol-he { fill: url(#mol-knob-tex); }
+  /* same teal wash the slider thumbs lay over their knob texture, so the atom reads as the site's metal, not raw chrome */
+  .molecule .mol-he-tint { fill: var(--teal-dim); opacity: 0.55; pointer-events: none; }
+  .molecule .mol-label {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    fill: #ffffff;
+    text-anchor: middle;
+    dominant-baseline: central;
+  }
+  .molecule .mol-label-he { font-size: 7px; }
+
+  .scroll-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 2px 0 18px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--teal-dim);
+  }
+  .scroll-hint-arrow {
+    fill: none;
+    stroke: var(--teal-dim);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .cycle-intro {
+    margin-top: 4px;
+  }
+  .cycle-intro p {
+    font-family: var(--font-display);
+    font-size: 14.5px;
+    line-height: 1.7;
+    color: var(--ink-dim);
+    font-weight: 500;
+    margin: 0 0 12px;
+  }
+  .cycle-intro p:last-child { margin-bottom: 0; }
+  .cycle-intro strong { color: var(--paper); font-weight: 700; }
+
+  /* brushed-metal strip matching the nav bar's chamfer-panel rim weight */
+  .hero-bottom-bar {
+    height: 16px;
+    margin: 0 -24px;
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 40%),
+      linear-gradient(180deg, var(--steel-650), var(--steel-800)),
+      var(--aluminum);
+    background-repeat: no-repeat, no-repeat, no-repeat;
+    background-size: 100% 100%, 100% 100%, cover;
+    background-position: center, center, center;
+    background-blend-mode: normal, overlay, normal;
+    border-top: 1.5px solid var(--steel-900);
+    border-bottom: 1.5px solid var(--steel-900);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  /* spacing so the title isn't flush against the bar above */
+  .diagram-title-row {
+    margin-top: 32px;
+  }
+
+  .diagram-credit {
+    margin: 4px auto 28px;
+    font-family: var(--font-display);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ink-dim);
+    font-weight: 500;
+  }
+  .diagram-credit em { font-style: italic; }
+  .diagram-credit a {
+    color: var(--teal-dim);
+    text-decoration: none;
+  }
+  .diagram-credit a:hover { text-decoration: underline; }
 </style>

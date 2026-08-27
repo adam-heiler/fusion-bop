@@ -3,12 +3,80 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import CO2BraytonCycle from '../components/CO2BraytonCycle.svelte';
 ---
 <BaseLayout title="CO2 Brayton">
-  <div class="page-container">
-    <h2 class="page-title">CO<sub>2</sub> Brayton Cycle</h2>
+  <section class="co2-hero">
+    <div class="co2-align">
+      <div class="title-row">
+        <svg class="molecule" aria-hidden="true" viewBox="0 0 48 30"><defs><pattern id="mol-knob-tex" patternUnits="objectBoundingBox" patternContentUnits="objectBoundingBox" width="1" height="1"><image href="/buttons/knob-silver.png" x="0" y="0" width="1" height="1" preserveAspectRatio="xMidYMid slice"/></pattern></defs><line class="mol-bond" x1="24" y1="13.4" x2="8" y2="13.4"/><line class="mol-bond" x1="24" y1="16.6" x2="8" y2="16.6"/><line class="mol-bond" x1="24" y1="13.4" x2="40" y2="13.4"/><line class="mol-bond" x1="24" y1="16.6" x2="40" y2="16.6"/><circle class="mol-o" cx="8" cy="15" r="6"/><circle class="mol-c" cx="24" cy="15" r="6.5"/><circle class="mol-o" cx="40" cy="15" r="6"/><circle class="mol-o-tint" cx="8" cy="15" r="6"/><circle class="mol-c-tint" cx="24" cy="15" r="6.5"/><circle class="mol-o-tint" cx="40" cy="15" r="6"/><text class="mol-label mol-label-o" x="8" y="15">O</text><text class="mol-label mol-label-c" x="24" y="15">C</text><text class="mol-label mol-label-o" x="40" y="15">O</text></svg>
+        <h2 class="page-title">Supercritical CO<sub>2</sub> Recompression Brayton Cycle</h2>
+      </div>
+      <div class="scroll-hint">
+        <span>Scroll for simulator</span>
+        <svg class="scroll-hint-arrow" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <polyline points="3,6 8,11 13,6" />
+        </svg>
+      </div>
+      <div class="cycle-intro">
+        <p>
+          The Brayton cycle you might already know from gas turbines runs on ordinary
+          air: compress it, add heat, expand it through a turbine, dump the exhaust.
+          Swap the air for carbon dioxide and keep the whole loop above CO<sub>2</sub>'s
+          critical point (7.38 MPa, 31 °C) instead of venting to atmosphere, and you get
+          a closed-loop supercritical CO<sub>2</sub> (sCO<sub>2</sub>) Brayton cycle. Above
+          the critical point, CO<sub>2</sub> never boils, it just gets progressively denser
+          as pressure rises, so the compressor inlet sits in a liquid-like, high-density
+          region where compression work is far lower than compressing a normal gas. That
+          single fact is what makes sCO<sub>2</sub> cycles compact: smaller compressors,
+          smaller turbines, a fraction of the footprint of an equivalent steam plant, which
+          is a big part of why they keep coming up in Gen IV fission, concentrated solar,
+          and now fusion balance-of-plant studies.
+        </p>
+        <p>
+          <strong>Recompression</strong> is the fix for a problem specific to this fluid.
+          A plain regenerative Brayton cycle, one recuperator recovering heat from the
+          turbine exhaust to preheat the compressor discharge, runs into trouble near
+          CO<sub>2</sub>'s critical point. Specific heat spikes there, and it spikes
+          asymmetrically: the cold, dense stream heading into the heater has a much higher
+          cp than the hot, lower-density stream coming off the turbine. A single recuperator
+          sized to avoid a temperature crossover at one end ends up oversized, and full of
+          irreversibility, everywhere else. The standard fix, modeled here, splits the
+          stream after a low-temperature recuperator: part of it goes straight to a second,
+          auxiliary compressor without being cooled first, and only the rest passes through
+          the precooler to the main compressor. That keeps both recuperators' hot and cold
+          streams closer in heat capacity across their whole length, which is what actually
+          fixes the pinch.
+        </p>
+        <p>
+          <strong>Layout</strong> follows that recompression architecture: a turbine expanding
+          from the intermediate loop's peak temperature, a reheat pass partway through the
+          expansion to pick up more heat before the low-pressure stage, then a high-temperature
+          recuperator (HTR) and low-temperature recuperator (LTR) in series recovering as much
+          of that exhaust heat as their effectiveness allows, a main compressor and a
+          recompressor splitting the return flow as described above, and a precooler ahead of
+          the main compressor rejecting the rest to the circulating-water/cooling-tower loop.
+        </p>
+        <p>
+          Both the turbine inlet and the reheat inlet draw straight from the same solar-salt
+          intermediate loop as the Rankine cycle, 565 °C supply from the Secondary HTX, so the
+          sliders here are capped at 560 °C: push either one to a full round 600 °C and you'd
+          be asking the CO<sub>2</sub> to leave the heat exchanger hotter than the salt
+          supplying it, which no heat exchanger can do.
+        </p>
+      </div>
+    </div>
+  </section>
+  <div class="hero-bottom-bar"></div>
+  <div class="co2-align diagram-title-row">
+    <h3 class="page-title">Supercritical CO<sub>2</sub> Recompression Brayton Cycle Diagram</h3>
   </div>
   <div class="page-breakout">
     <img class="cycle-diagram diagram-co2" src="/diagrams/fusion-co2-brayton.png" alt="Process flow diagram of the supercritical CO2 recompression Brayton cycle balance of plant" width="1653" height="800" />
   </div>
+  <p class="co2-align diagram-credit">
+    Cycle layout adapted from
+    Colliva, F.; Ciurluini, C.; Iaboni, A.; Centomani, G.V.; Trotta, A.; Giannetti, F.
+    "Analysis of Power Conversion System Options for ARC-like Tokamak Fusion Reactor
+    Balance of Plant." <em>Sustainability</em> <strong>2024</strong>, <em>16</em>, 7480. <a href="https://doi.org/10.3390/su16177480" target="_blank" rel="noopener noreferrer">doi.org/10.3390/su16177480</a>
+  </p>
   <div class="simulator-box chamfer-panel chamfer-all">
     <!-- plain div, not CO2BraytonCycle directly. astro's own astro-island wrapper
          is display:contents, so chamfer-panel's z-index promotion no-ops on it. -->
@@ -17,7 +85,137 @@ import CO2BraytonCycle from '../components/CO2BraytonCycle.svelte';
 </BaseLayout>
 
 <style>
-  /* sized off this diagram's native resolution, same scale factor as the
-     rankine and he diagrams so labels read at a consistent size across all three. */
+  /* sized off this diagram's native resolution, same scale factor as rankine and he diagrams for consistent label size */
   .diagram-co2 { max-width: 1050px; }
+
+  .co2-align {
+    max-width: 1028px;
+    margin: 0 auto;
+  }
+
+  /* full-bleed teal-fade hero, same recipe as the rankine page */
+  .co2-hero {
+    position: relative;
+    overflow: hidden;
+    margin: -24px -24px 0;
+    padding: 40px max(24px, calc(50vw - 640px)) 32px;
+    background-image:
+      linear-gradient(180deg, rgba(53, 214, 180, 0.11), rgba(53, 214, 180, 0) 88%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 42%),
+      linear-gradient(163deg, var(--steel-300), var(--steel-500) 85%);
+    background-blend-mode: normal;
+    background-size: cover;
+    background-position: center;
+  }
+
+  /* decorative CO2 molecule flanking the title, three knob-textured atoms with a
+     double-bond pair of lines on each side, same construction as the rankine
+     page's H2O molecule. title-row is a positioning anchor: the molecule is
+     absolutely positioned into the left margin so it never shifts the title
+     text, which stays flush with the same left edge as the rest of the page. */
+  .title-row {
+    position: relative;
+  }
+  .title-row .page-title {
+    font-size: 30px;
+  }
+  .molecule {
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-right: 14px;
+    width: 128px;
+    height: auto;
+    opacity: 0.95;
+  }
+  @media (max-width: 1220px) {
+    .molecule { display: none; }
+  }
+  .molecule .mol-bond { stroke: var(--steel-900); stroke-width: 1.6; stroke-linecap: round; }
+  .molecule .mol-o { fill: url(#mol-knob-tex); }
+  .molecule .mol-c { fill: url(#mol-knob-tex); }
+  /* same teal wash the slider thumbs lay over their knob texture, so the atoms read as the site's metal, not raw chrome */
+  .molecule .mol-o-tint { fill: var(--teal); opacity: 0.5; pointer-events: none; }
+  .molecule .mol-c-tint { fill: var(--teal-dim); opacity: 0.6; pointer-events: none; }
+  .molecule .mol-label {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    fill: #ffffff;
+    text-anchor: middle;
+    dominant-baseline: central;
+  }
+  .molecule .mol-label-o { font-size: 6.5px; }
+  .molecule .mol-label-c { font-size: 7px; }
+
+  .scroll-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 2px 0 18px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--teal-dim);
+  }
+  .scroll-hint-arrow {
+    fill: none;
+    stroke: var(--teal-dim);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .cycle-intro {
+    margin-top: 4px;
+  }
+  .cycle-intro p {
+    font-family: var(--font-display);
+    font-size: 14.5px;
+    line-height: 1.7;
+    color: var(--ink-dim);
+    font-weight: 500;
+    margin: 0 0 12px;
+  }
+  .cycle-intro p:last-child { margin-bottom: 0; }
+  .cycle-intro strong { color: var(--paper); font-weight: 700; }
+
+  /* brushed-metal strip matching the nav bar's chamfer-panel rim weight */
+  .hero-bottom-bar {
+    height: 16px;
+    margin: 0 -24px;
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 40%),
+      linear-gradient(180deg, var(--steel-650), var(--steel-800)),
+      var(--aluminum);
+    background-repeat: no-repeat, no-repeat, no-repeat;
+    background-size: 100% 100%, 100% 100%, cover;
+    background-position: center, center, center;
+    background-blend-mode: normal, overlay, normal;
+    border-top: 1.5px solid var(--steel-900);
+    border-bottom: 1.5px solid var(--steel-900);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  /* spacing so the title isn't flush against the bar above */
+  .diagram-title-row {
+    margin-top: 32px;
+  }
+
+  .diagram-credit {
+    margin: 4px auto 28px;
+    font-family: var(--font-display);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ink-dim);
+    font-weight: 500;
+  }
+  .diagram-credit em { font-style: italic; }
+  .diagram-credit a {
+    color: var(--teal-dim);
+    text-decoration: none;
+  }
+  .diagram-credit a:hover { text-decoration: underline; }
 </style>

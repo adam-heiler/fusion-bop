@@ -1,0 +1,786 @@
+---
+// static reference content, not a simulator control
+---
+
+<div class="eq-wrap page-container">
+  <h2 class="page-title">Modeling Details</h2>
+  <p class="eq-intro">
+    Many of the equations used to simulate the Rankine cycle above will look familiar
+    because many are the same equations taught and used analytically in undergraduate thermodynamics
+    courses, derived from the First Law and Second Law. Of course, the complexity of the cycle itself
+    is far higher than any Rankine cycle you would analyze by hand in class. Solving
+    this cycle by hand would be diabolical. Beyond that, I did take some liberties to
+    add some new quirks to make the simulation more realistic, like terminal temperature
+    difference (TTD) for feedwater heaters, dependent condenser pressure, and an empirically-based cooling tower model. All is explained below.
+  </p>
+  <p class="eq-intro">
+    CoolProp calculates properties using mathematical formulas known as
+    equations of state rather than interpolating steam tables. However, the concept
+    that you can determine the rest of the properties of a fluid from two known properties
+    remains the same.
+  </p>
+  <p class="eq-intro">
+    Here are some notation norms used in the sections below: In a general form, a(b, c)
+    is the property "a" when the properies "b" and "c" are known. For example, h(P, T) is enthalpy at a given pressure and temperature.
+    T<sub>sat</sub>(P) is the saturation
+    temperature at a given pressure, and h<sub>f</sub>(P) is the enthalpy of
+    a saturated liquid at that pressure.
+  </p>
+
+  <!-- ============================= TURBINES ============================= -->
+  <article class="eq-component">
+    <h3>Turbines</h3>
+    <p>
+      The turbines are modeled using isentropic efficiency. An ideal turbine expands steam to the exit pressure along a path of constant entropy.
+      A real turbine can be modeled with an isentropic efficiency to account for inevitable losses. You probably already know this:
+    </p>
+    <div class="eq-formula">η = actual work / isentropic work = (h<sub>in</sub> − h<sub>out</sub>) / (h<sub>in</sub> − h<sub>2s</sub>)</div>
+    <p>Solving for the actual exit state once the inlet state, exit pressure, and efficiency are known:</p>
+    <div class="eq-formula">h<sub>2s</sub> = h(P<sub>out</sub>, s<sub>in</sub>)</div>
+    <div class="eq-formula">h<sub>out</sub> = h<sub>in</sub> − η·(h<sub>in</sub> − h<sub>2s</sub>)</div>
+    <p>
+      Two different laws are at play here. The actual-work line,
+      h<sub>out</sub> = h<sub>in</sub> − η·(h<sub>in</sub> − h<sub>2s</sub>), is the First Law steady-flow
+      energy balance for an adiabatic device with negligible KE/PE change, so work out
+      equals the enthalpy drop. The ideal reference state h<sub>2s</sub> comes from the
+      Second Law. An isentropic (constant-entropy) path is the reversible
+      limit for any adiabatic process, since the real path always generates some
+      entropy (Moran et al., Ch. 6).
+    </p>
+
+    <p class="eq-subhead">Turbine and extraction taps in this cycle:</p>
+    <ul class="eq-instances">
+      <li><span class="eq-instance-name">HP turbine</span>, state 1 to state 2: h<sub>2s</sub> = h(P<sub>2</sub>, s<sub>1</sub>); h<sub>2</sub> = h<sub>1</sub> − η<sub>HP</sub>·(h<sub>1</sub> − h<sub>2s</sub>)</li>
+      <li><span class="eq-instance-name">HP turbine, extraction B1</span>, state 1 to FWH5: h<sub>B1,s</sub> = h(P<sub>B</sub>, s<sub>1</sub>); h<sub>B1</sub> = h<sub>1</sub> − η<sub>HP</sub>·(h<sub>1</sub> − h<sub>B1,s</sub>)</li>
+      <li><span class="eq-instance-name">IP turbine</span>, state 3 to state 4: h<sub>4s</sub> = h(P<sub>4</sub>, s<sub>3</sub>); h<sub>4</sub> = h<sub>3</sub> − η<sub>IP</sub>·(h<sub>3</sub> − h<sub>4s</sub>)</li>
+      <li><span class="eq-instance-name">IP turbine, extraction C1</span>, state 3 to FWH4: h<sub>C1,s</sub> = h(P<sub>C</sub>, s<sub>3</sub>); h<sub>C1</sub> = h<sub>3</sub> − η<sub>IP</sub>·(h<sub>3</sub> − h<sub>C1,s</sub>)</li>
+      <li><span class="eq-instance-name">IP turbine, extraction D1</span>, state 3 to the deaerator: h<sub>D1,s</sub> = h(P<sub>D</sub>, s<sub>3</sub>); h<sub>D1</sub> = h<sub>3</sub> − η<sub>IP</sub>·(h<sub>3</sub> − h<sub>D1,s</sub>)</li>
+      <li><span class="eq-instance-name">LP turbine</span>, state 4 to state 5: h<sub>5s</sub> = h(P<sub>5</sub>, s<sub>4</sub>); h<sub>5</sub> = h<sub>4</sub> − η<sub>LP</sub>·(h<sub>4</sub> − h<sub>5s</sub>), where P<sub>5</sub> = P<sub>6</sub>, the condenser pressure solved for below</li>
+      <li><span class="eq-instance-name">LP turbine, extraction E1</span>, state 4 to FWH3: h<sub>E1,s</sub> = h(P<sub>E</sub>, s<sub>4</sub>); h<sub>E1</sub> = h<sub>4</sub> − η<sub>LP</sub>·(h<sub>4</sub> − h<sub>E1,s</sub>)</li>
+      <li><span class="eq-instance-name">LP turbine, extraction F1</span>, state 4 to FWH2: h<sub>F1,s</sub> = h(P<sub>F</sub>, s<sub>4</sub>); h<sub>F1</sub> = h<sub>4</sub> − η<sub>LP</sub>·(h<sub>4</sub> − h<sub>F1,s</sub>)</li>
+      <li><span class="eq-instance-name">LP turbine, extraction G1</span>, state 4 to FWH1: h<sub>G1,s</sub> = h(P<sub>G</sub>, s<sub>4</sub>); h<sub>G1</sub> = h<sub>4</sub> − η<sub>LP</sub>·(h<sub>4</sub> − h<sub>G1,s</sub>)</li>
+    </ul>
+  </article>
+
+  <!-- ============================== PUMPS ============================== -->
+  <article class="eq-component">
+    <h3>Pumps</h3>
+    <p>
+      Pumps use the mirror image of the turbine equation, using isentropic efficiency. An ideal pump would need less work than a
+      real pump to reach the same exit pressure:
+    </p>
+    <div class="eq-formula">η = isentropic work / actual work = (h<sub>2s</sub> − h<sub>in</sub>) / (h<sub>out</sub> − h<sub>in</sub>)</div>
+    <div class="eq-formula">h<sub>2s</sub> = h(P<sub>out</sub>, s<sub>in</sub>)</div>
+    <div class="eq-formula">h<sub>out</sub> = h<sub>in</sub> + (h<sub>2s</sub> − h<sub>in</sub>) / η</div>
+    <p>
+      As with the turbines, the actual-work line comes
+      from the First Law energy balance. The ideal reference state
+      h<sub>2s</sub> is still the Second Law's constant-entropy reversible limit,
+      now for a work-consuming device instead of a work-producing one.
+    </p>
+    <p>
+      A real plant may use small booster pumps to push a heater's own drain
+      forward into the feedwater line. The governing equation is
+      identical either way.
+    </p>
+
+    <p class="eq-subhead">Pumps in this cycle:</p>
+    <ul class="eq-instances">
+      <li><span class="eq-instance-name">Condensate pump</span>, state 6 to state 7: h<sub>7s</sub> = h(P<sub>condpump</sub>, s<sub>6</sub>); h<sub>7</sub> = h<sub>6</sub> + (h<sub>7s</sub> − h<sub>6</sub>)/η<sub>pump</sub></li>
+      <li><span class="eq-instance-name">Feedwater pump</span>, state 11 to state 12: h<sub>12s</sub> = h(P<sub>fw</sub>, s<sub>11</sub>); h<sub>12</sub> = h<sub>11</sub> + (h<sub>12s</sub> − h<sub>11</sub>)/η<sub>pump</sub></li>
+      <li><span class="eq-instance-name">Pump A</span>, FWH6 drain A4 to A5: h<sub>A5,s</sub> = h(P<sub>fw</sub>, s<sub>A4</sub>); h<sub>A5</sub> = h<sub>A4</sub> + (h<sub>A5,s</sub> − h<sub>A4</sub>)/η<sub>pump</sub></li>
+      <li><span class="eq-instance-name">Pump B</span>, FWH5 drain B2 to B3: h<sub>B3,s</sub> = h(P<sub>fw</sub>, s<sub>B2</sub>); h<sub>B3</sub> = h<sub>B2</sub> + (h<sub>B3,s</sub> − h<sub>B2</sub>)/η<sub>pump</sub></li>
+      <li><span class="eq-instance-name">Pump E</span>, FWH3 drain E2 to E3: h<sub>E3,s</sub> = h(P<sub>condpump</sub>, s<sub>E2</sub>); h<sub>E3</sub> = h<sub>E2</sub> + (h<sub>E3,s</sub> − h<sub>E2</sub>)/η<sub>pump</sub></li>
+      <li><span class="eq-instance-name">Pump F</span>, FWH2 drain F2 to F3: h<sub>F3,s</sub> = h(P<sub>condpump</sub>, s<sub>F2</sub>); h<sub>F3</sub> = h<sub>F2</sub> + (h<sub>F3,s</sub> − h<sub>F2</sub>)/η<sub>pump</sub></li>
+      <li><span class="eq-instance-name">Circulating water pump</span>, cooling tower basin to condenser inlet and back up to the tower's fill/distribution deck. This cycle uses a natural-draft hyperbolic tower (buoyancy-driven, no fan) rather than a mechanical-draft one - the pump only has to reach the fill deck, not the top of the tower's much taller empty chimney shell above it. There is technically no piping/tower layout modeled, so the head is two generic terms: ΔP<sub>cw</sub> = ρ<sub>cw</sub>·g·h<sub>lift</sub> + ΔP<sub>ref</sub>·(ṁ<sub>cw</sub>/ṁ<sub>ref</sub>)², a fixed lift (15&nbsp;m, a typical fill-deck height for a large natural-draft tower) plus a friction term that scales with the square of the actual circulating water flow off a reference point. It responds to the r<sub>cw</sub> slider and the solved cycle. Then h<sub>cw,out,s</sub> = h(P<sub>cw,lo</sub>+ΔP<sub>cw</sub>, s<sub>cw,in</sub>); h<sub>cw,out</sub> = h<sub>cw,in</sub> + (h<sub>cw,out,s</sub> − h<sub>cw,in</sub>)/η<sub>pump</sub>. Both anchor figures are generic plant-scale ballparks.</li>
+    </ul>
+  </article>
+
+  <!-- ==================== BOILER ==================== -->
+  <article class="eq-component">
+    <h3>Steam generator (boiler)</h3>
+    <p>
+      A boiler is constant-pressure heat addition with no work done, so the
+      steady-flow energy balance (derived from the First Law, Moran et al.,
+      Ch. 4) reduces to heat in per unit mass equals the
+      enthalpy rise:
+    </p>
+    <div class="eq-formula">q<sub>in</sub> = h<sub>out</sub> − h<sub>in</sub></div>
+    <p>
+      This simulator sets the boiler's outlet temperature directly instead of
+      solving for it, so the same energy balance is run in reverse. Given the
+      boiler's total thermal duty, the mass flow rate of steam it can support is
+    </p>
+    <div class="eq-formula">ṁ = <span class="q-rate">Q</span> / (h<sub>1</sub> − h<sub>15</sub>), where <span class="q-rate">Q</span> is the duty slider (MW) converted to watts</div>
+    <p>
+      In this model, the duty arrives from the plant's <em>intermediate</em> loop, 
+      which is the solar-salt stream shown in the diagram above. I assume the solar salt enters
+      at 565 °C and leaves at 505 °C (Colliva et al. 2024, Table 1). Note that the Colliva
+      study assumes this fluid is FliBe, however I made a different assumption based on
+      my research. See the "Tokamak Systems" tab for more details. The First Law balance above only cares
+      about the duty and the steam's own states, not that supply temperature, but the Second Law does. See "Cycle performance" below to learn how the
+      intermediate loop sets the exergy limit on
+      what the steam generator can actually deliver. This goes into the Second Law Efficiency calculation.
+    </p>
+  </article>
+
+  <!-- ============================ CONDENSER ============================ -->
+  <article class="eq-component">
+    <h3>Condenser</h3>
+    <p>
+      A textbook condenser rejects heat at a constant pressure to a sink at some
+      assumed fixed temperature, with the exit leaving as saturated liquid. The
+      condenser pressure is usually handed to you as a known input. But in the real world,
+      condenser pressure is very much determined by outside factors, so I added some
+      complexity to the modeling of this component. Brace yourself.
+    </p>
+    <p>
+      This model treats the condenser pressure as a parameter to solve for.
+      So, we employ heat exchanger effectiveness analysis. The solver uses the
+      ε-NTU method, which is a First Law energy balance on both streams combined with a
+      heat transfer rate equation (see Incropera et al., Ch. 11). The two streams are, of course,
+      the condensing steam and the circulating-water loop.
+    </p>
+    <p>
+      NTU (number of transfer units) is a dimensionless measure of how large
+      the exchanger is relative to the fluid flowing through it. Greater heat
+      transfer area or a smaller flow rate both increase NTU. Effectiveness ε is
+      the fraction of the maximum possible heat transfer the exchanger
+      actually achieves, capped at 1 as NTU increases. In general, ε depends on
+      NTU and the ratio of the two streams' heat capacity rates, C<sub>r</sub>. But, because the steam is condensing,
+      it stays at a single temperature across the whole exchanger. This is a special case where one side's heat
+      capacity rate is effectively infinite (C<sub>r</sub> approaches 0) which collapses the usual ε-NTU relation to a single exponential (yay):
+    </p>
+    <div class="eq-formula">NTU = UA / (ṁ<sub>cw</sub>·cp<sub>cw</sub>)</div>
+    <div class="eq-formula">ε = 1 − e<sup>−NTU</sup></div>
+    <p>
+      The heat the condenser must reject and the circulating-water inlet
+      temperature (set by the cooling tower), determine the
+      steam-side saturation temperature. The exit still leaves as saturated
+      liquid because I set it that way, matching the textbook idealization. Since the condenser
+      duty itself depends on the exhaust steam's own state, which depends on the
+      condenser pressure being solved for, this is solved with a trial loop instead of a single formula.
+      The loop re-guesses the condenser
+      temperature T<sub>6</sub> each pass until it converges (usually
+      within two or three passes, light work). Every line in the loop below is still just
+      the First Law energy balance on the steam side:
+    </p>
+    <div class="eq-formula">P<sub>6</sub> = P<sub>sat</sub>(T<sub>6</sub>)</div>
+    <div class="eq-formula">h<sub>6</sub> = h<sub>f</sub>(P<sub>6</sub>)</div>
+    <div class="eq-formula">h<sub>5</sub> = h<sub>4</sub> − η<sub>LP</sub>·[h<sub>4</sub> − h(P<sub>6</sub>, s<sub>4</sub>)]</div>
+    <div class="eq-formula">h<sub>7</sub> = h<sub>6</sub> + [h(P<sub>condpump</sub>, s<sub>6</sub>) − h<sub>6</sub>]/η<sub>pump</sub></div>
+    <div class="eq-formula">g = flow<sub>FWH1</sub>·(h<sub>7'</sub> − h<sub>7</sub>) / (h<sub>G1</sub> − h<sub>G2</sub>) &nbsp;(FWH1's extraction fraction, solved here since it needs h<sub>7</sub>)</div>
+    <div class="eq-formula">flow<sub>cond</sub> = flow<sub>FWH1</sub> − g</div>
+    <div class="eq-formula">Q<sub>cond</sub> = flow<sub>cond</sub>·h<sub>5</sub> + g·h<sub>G2</sub> − flow<sub>FWH1</sub>·h<sub>6</sub></div>
+    <div class="eq-formula">T<sub>6,next</sub> = T<sub>cw,in</sub> + Q<sub>cond</sub> / (ε·ṁ<sub>cw</sub>·cp<sub>cw</sub>)</div>
+    <p>
+      Once converged, the LP exhaust quality is read directly at the exhaust
+      state. If the exhaust steam happens to be superheated instead of wet
+      (possible at a low LP turbine efficiency), its temperature needs its own
+      lookup instead of just reading the saturation temperature:
+    </p>
+    <div class="eq-formula">x<sub>5</sub> = quality(P<sub>5</sub>, h<sub>5</sub>)</div>
+    <div class="eq-formula">T<sub>5</sub> = T<sub>6</sub> if x<sub>5</sub> ≥ 0 (wet), else T(P<sub>5</sub>, h<sub>5</sub>) (superheated)</div>
+  </article>
+
+  <!-- ================= COOLING TOWER ================= -->
+  <article class="eq-component">
+    <h3>Cooling tower and circulating water loop</h3>
+    <p>
+      The condenser's cold-side fluid is cooled by an evaporative cooling tower, which relies on mass transfer
+      (water evaporating into air) as much as heat transfer. This means I had to up the complexity of this simulation as well.
+    </p>
+    <p>
+      Physically, the coldest a cooling tower could ever get the circulating water is the
+      surrounding air's wet-bulb temperature. Real
+      towers can't quite reach that limit, so they're rated by how many degrees above the wet-bulb temperature the cooled
+      water actually leaves at.
+    </p>
+    <div class="eq-formula">T<sub>cw,in</sub> = T<sub>wb</sub> + approach</div>
+    <p>
+      The wet-bulb temperature itself is found from the ambient dry-bulb temperature T<sub>0</sub> and
+      relative humidity RH using an empirical curve fit to measured
+      psychrometric data (Stull, 2011, see Sources), rather than solving the
+      adiabatic-saturation energy balance or reading a psychrometric chart by
+      hand, hence the disgusting formula that follows:
+    </p>
+    <div class="eq-formula eq-wrap-tight">
+      T<sub>wb</sub> = T<sub>0</sub>·atan[0.151977·(RH + 8.313659)<sup>0.5</sup>]
+      + atan(T<sub>0</sub> + RH) − atan(RH − 1.676331)
+      + 0.00391838·RH<sup>1.5</sup>·atan(0.023101·RH) − 4.686035
+    </div>
+    <p>
+      Specific heat varies slightly with temperature, but the condenser
+      calculation treats it as one constant value throughout rather than
+      tracking it as the circulating water warms up. The constant is
+      evaluated 8°C above the basin temperature, a stand-in for roughly the
+      midpoint of the water's actual rise across the condenser, rather than
+      its coldest point at the inlet:
+    </p>
+    <div class="eq-formula">cp<sub>cw</sub> = cp(1.5&nbsp;bar, T<sub>cw,in</sub> + 8°C)</div>
+  </article>
+
+  <!-- ================= CLOSED FEEDWATER HEATERS ================= -->
+  <article class="eq-component">
+    <h3>Closed feedwater heaters</h3>
+    <p>
+      A textbook closed feedwater heater is a shell-and-tube heat
+      exchanger. Extraction steam condenses on the shell side, giving up its
+      latent heat, while feedwater flows through the tubes.
+    </p>
+    <p>
+      Feedwater can approach the shell-side
+      saturation temperature but never reach or cross it. A real heat exchanger
+      would need infinite surface area for the feedwater outlet temperature to
+      equal the shell-side saturation temperatue. Terminal temperature difference (TTD) is
+      the practical stand-in for this limit. TTD is the minimum temperature gap a design
+      leaves between the feedwater's outlet temperature and the shell-side
+      saturation temperature.
+    </p>
+    <div class="eq-formula">T<sub>tube,out</sub> = T<sub>sat</sub>(P<sub>shell</sub>) − TTD</div>
+    <div class="eq-formula">h<sub>tube,out</sub> = h(P<sub>feedwater</sub>, T<sub>tube,out</sub>)</div>
+    <p>This part matches the textbook model exactly. Two things are simplified relative to a fully detailed heater:</p>
+    <p>
+      First, textbook problems often assume the shell-side drain leaves as
+      saturated liquid. This model instead subcools it a fixed amount below
+      saturation, a drain-cooling allowance closer to how a real feedwater
+      heater with an integral drain-cooling zone behaves:
+    </p>
+    <div class="eq-formula">h<sub>drain</sub> = h<sub>f</sub>(P<sub>shell</sub>) − ΔT<sub>sub</sub>·cp<sub>f</sub>(P<sub>shell</sub>), &nbsp;ΔT<sub>sub</sub> = 2.8°C fixed</div>
+    <p>
+      Second, rather than modeling desuperheating, condensing, and subcooling as
+      three separate exchanger zones the way a detailed heater design would,
+      each heater here is solved as one lumped energy balance: heat given up by
+      the condensing extraction steam equals the heat picked up by the
+      feedwater, a direct First Law statement (no work, no heat lost to the
+      surroundings) and the same balance behind the standard "extraction
+      fraction" example problem in a thermo course (Moran et al., Ch. 8).
+    </p>
+    <div class="eq-formula">x·(h<sub>steam,in</sub> − h<sub>drain,out</sub>) = ṁ<sub>tube</sub>·(h<sub>tube,out</sub> − h<sub>tube,in</sub>)</div>
+
+    <p class="eq-subhead">Every closed feedwater heater in this plant, coldest to hottest:</p>
+    <ul class="eq-instances">
+      <li>
+        <span class="eq-instance-name">FWH1</span>, shell pressure P<sub>G</sub>, heats state 7 (condensate pump outlet) to h<sub>7'</sub>.
+        <div class="eq-formula">h<sub>7'</sub> = h(P<sub>condpump</sub>, T<sub>sat</sub>(P<sub>G</sub>) − TTD)</div>
+        <div class="eq-formula">h<sub>G2</sub> = h<sub>f</sub>(P<sub>G</sub>) − ΔT<sub>sub</sub>·cp<sub>f</sub>(P<sub>G</sub>)</div>
+        Its drain doesn't get pumped forward: it flashes through Valve G straight into the condenser (see Valves, below). Its extraction fraction g is solved together with the condenser, since it depends on h<sub>7</sub>, which depends on the converged condenser pressure.
+      </li>
+      <li>
+        <span class="eq-instance-name">FWH2</span>, shell pressure P<sub>F</sub>, heats state 8 to h<sub>8'</sub>.
+        <div class="eq-formula">h<sub>8'</sub> = h(P<sub>condpump</sub>, T<sub>sat</sub>(P<sub>F</sub>) − TTD)</div>
+        <div class="eq-formula">h<sub>F2</sub> = h<sub>f</sub>(P<sub>F</sub>) − ΔT<sub>sub</sub>·cp<sub>f</sub>(P<sub>F</sub>)</div>
+        <div class="eq-formula">flow<sub>FWH2</sub> = ṁ − a − b − c − d − e</div>
+        <div class="eq-formula">f·(h<sub>F1</sub> − h<sub>F2</sub> + h<sub>F3</sub> − h<sub>7'</sub>) = flow<sub>FWH2</sub>·(h<sub>8'</sub> − h<sub>7'</sub>)</div>
+        Its drain is boosted by Pump F and rejoins at mixer M1, just ahead of its own tube inlet (see Mixing junctions).
+      </li>
+      <li>
+        <span class="eq-instance-name">FWH3</span>, shell pressure P<sub>E</sub>, heats state 9 to state 10.
+        <div class="eq-formula">h<sub>10</sub> = h(P<sub>condpump</sub>, T<sub>sat</sub>(P<sub>E</sub>) − TTD)</div>
+        <div class="eq-formula">h<sub>E2</sub> = h<sub>f</sub>(P<sub>E</sub>) − ΔT<sub>sub</sub>·cp<sub>f</sub>(P<sub>E</sub>)</div>
+        <div class="eq-formula">flow<sub>FWH3</sub> = ṁ − a − b − c − d</div>
+        <div class="eq-formula">e = flow<sub>FWH3</sub>·(h<sub>10</sub> − h<sub>8'</sub>) / (h<sub>E1</sub> − h<sub>8'</sub>)</div>
+        Its drain is boosted by Pump E and rejoins at mixer M2, ahead of its own tube inlet.
+      </li>
+      <li>
+        <span class="eq-instance-name">FWH4</span>, shell pressure P<sub>C</sub>, heats state 12 (feedwater pump outlet).
+        <div class="eq-formula">h<sub>12'</sub> = h(P<sub>fw</sub>, T<sub>sat</sub>(P<sub>C</sub>) − TTD)</div>
+        <div class="eq-formula">h<sub>C2</sub> = h<sub>f</sub>(P<sub>C</sub>) − ΔT<sub>sub</sub>·cp<sub>f</sub>(P<sub>C</sub>)</div>
+        <div class="eq-formula">c = (ṁ − a − b)·(h<sub>12'</sub> − h<sub>12</sub>) / (h<sub>C1</sub> − h<sub>C2</sub>)</div>
+        Its drain isn't pumped: it's throttled through Valve C straight into the deaerator (see Valves).
+      </li>
+      <li>
+        <span class="eq-instance-name">FWH5</span>, shell pressure P<sub>B</sub>, heats state 13 to h<sub>13'</sub>.
+        <div class="eq-formula">h<sub>13'</sub> = h(P<sub>fw</sub>, T<sub>sat</sub>(P<sub>B</sub>) − TTD)</div>
+        <div class="eq-formula">h<sub>B2</sub> = h<sub>f</sub>(P<sub>B</sub>) − ΔT<sub>sub</sub>·cp<sub>f</sub>(P<sub>B</sub>)</div>
+        Its drain is boosted by Pump B and rejoins at mixer M4. FWH5 is coupled to FWH6 and the reheater through streams A and B, so its extraction fraction isn't solved alone, see the Reheater section below.
+      </li>
+      <li>
+        <span class="eq-instance-name">FWH6</span>, shell pressure P<sub>VA</sub>, heats state 14 to state 15 (boiler inlet), the hottest heater in the train.
+        <div class="eq-formula">h<sub>15</sub> = h(P<sub>fw</sub>, T<sub>sat</sub>(P<sub>VA</sub>) − TTD)</div>
+        <div class="eq-formula">h<sub>A4</sub> = h<sub>f</sub>(P<sub>VA</sub>) − ΔT<sub>sub</sub>·cp<sub>f</sub>(P<sub>VA</sub>)</div>
+        Unlike the other five, FWH6's steam supply (stream A) is tapped before the HP turbine entirely, not bled from a turbine casing, and its drain is boosted by Pump A and rejoins at mixer M5. See the Reheater section below.
+      </li>
+    </ul>
+  </article>
+
+  <!-- ================= REHEATER ================= -->
+  <article class="eq-component">
+    <h3>Reheater</h3>
+    <p>
+      Unlike the boiler, the reheater doesn't add heat from an outside
+      source. Its heat comes from stream A: steam tapped off before the HP
+      turbine entirely, never expanded, routed through the reheater's hot
+      side, where it cools while the main HP-exhaust flow on the cold side
+      heats up from state 2 to state 3. Both streams are internal to the
+      cycle, so this is a working-fluid-to-working-fluid heat exchanger, the
+      same kind of energy balance as a closed feedwater heater, not an
+      external heat-addition device like the boiler.
+    </p>
+    <p>
+      An idealized cycle diagram usually draws every heat exchanger as a
+      constant-pressure process, no friction, no losses. Real tube bundles,
+      headers, and connecting pipe all resist flow, so pressure drops a
+      little every time steam passes through one, the reheater included. That
+      loss doesn't come from either law either, it's a fluid-mechanics
+      effect (friction and minor losses along the flow path), so it's applied
+      here as a simple fixed percentage rather than solved from first
+      principles. The outlet temperature is set directly by the
+      T<sub>3</sub> slider:
+    </p>
+    <div class="eq-formula">P<sub>3</sub> = P<sub>2</sub>·(1 − ΔP<sub>reheat</sub>%)</div>
+    <div class="eq-formula">h<sub>3</sub> = h(P<sub>3</sub>, T<sub>3</sub>); s<sub>3</sub> = s(P<sub>3</sub>, T<sub>3</sub>)</div>
+    <p class="eq-subhead">Solving streams A and B (FWH5, FWH6, and the reheater together):</p>
+    <p>
+      Stream A is tapped off before the HP turbine (a1 is exactly state 1, not
+      an expanded bleed), then routed through the reheater's hot side, so it
+      picks up the reheater's duty before reaching FWH6. Stream B is a normal
+      HP turbine bleed feeding FWH5. Because A's flow depends on the
+      reheater's duty, which depends on how much flow is left in the main
+      steam path, which depends on A and B both, these three components are
+      solved together in closed form rather than one at a time:
+    </p>
+    <div class="eq-formula">β = (h<sub>13'</sub> − h<sub>12'</sub>) / (h<sub>B1</sub> − h<sub>B2</sub> + h<sub>B3</sub> − h<sub>12'</sub>)</div>
+    <div class="eq-formula">R = h<sub>3</sub> − h<sub>2</sub> &nbsp;(the reheater's enthalpy rise)</div>
+    <div class="eq-formula">a = ṁ·(R + h<sub>15</sub> − h<sub>13'</sub> − β·R) / (h<sub>1</sub> + R − h<sub>13'</sub> − h<sub>A4</sub> + h<sub>A5</sub> − β·R)</div>
+    <div class="eq-formula">b = (ṁ − a)·β</div>
+    <div class="eq-formula">h<sub>A2</sub> = h<sub>1</sub> − (ṁ−a−b)·R / a &nbsp;(reheater hot-side outlet, ~P<sub>1</sub>)</div>
+    <p>
+      All five of those equations are still just First Law energy balances,
+      three coupled together (reheater, FWH5, FWH6) instead of solved one at
+      a time; nothing here calls on the Second Law directly.
+    </p>
+  </article>
+
+  <!-- ================= OPEN FEEDWATER HEATER ================= -->
+  <article class="eq-component">
+    <h3>Open feedwater heater (deaerator)</h3>
+    <p>
+      A textbook open (direct-contact) feedwater heater lets the extraction
+      steam and the returning feedwater mix directly, with no tube wall
+      separating them. Because everything mixes together, the outlet always
+      leaves as saturated liquid at the heater's own pressure, no terminal
+      temperature difference needed:
+    </p>
+    <div class="eq-formula">h<sub>11</sub> = h<sub>f</sub>(P<sub>D</sub>); s<sub>11</sub> = s<sub>f</sub>(P<sub>D</sub>)</div>
+    <p>
+      This is exactly the textbook open-feedwater-heater model, unmodified.
+      The plant's one deaerator has three streams mixing into it: the flow
+      arriving from FWH3 (state 10), extraction steam D1 bled directly off the
+      IP turbine, and FWH4's drain after Valve C (C3). Its extraction fraction
+      comes from the same direct-mixing energy balance used in the standard
+      open-feedwater-heater example problem:
+    </p>
+    <div class="eq-formula">flow<sub>abc</sub> = ṁ − a − b − c</div>
+    <div class="eq-formula">d = [(ṁ−a−b)·h<sub>11</sub> − flow<sub>abc</sub>·h<sub>10</sub> − c·h<sub>C3</sub>] / (h<sub>D1</sub> − h<sub>10</sub>)</div>
+    <p>
+      Like every mixing calculation on this page, this is conservation of
+      mass paired with the First Law: total mass in equals mass out, and
+      total energy in equals energy out, with no work or heat crossing the
+      boundary.
+    </p>
+  </article>
+
+  <!-- ================= VALVES ================= -->
+  <article class="eq-component">
+    <h3>Throttling valves</h3>
+    <p>
+      A textbook throttle valve is adiabatic, does no work, and has negligible
+      change in kinetic or potential energy, so the First Law leaves enthalpy
+      unchanged across it, one of the cleanest applications of the steady-flow
+      energy balance in the whole cycle (Moran et al., Ch. 4):
+    </p>
+    <div class="eq-formula">h<sub>out</sub> = h<sub>in</sub></div>
+
+    <p class="eq-subhead">Every valve in this plant:</p>
+    <ul class="eq-instances">
+      <li><span class="eq-instance-name">Valve A</span>, A2 to A3: h<sub>A3</sub> = h<sub>A2</sub>. Drops the reheater hot-side outlet down to FWH6's shell pressure. FWH6's extraction steam is already two-phase by the time it enters the shell, so there's no desuperheating zone.</li>
+      <li><span class="eq-instance-name">Valve C</span>, C2 to C3: h<sub>C3</sub> = h<sub>C2</sub>. Drops FWH4's drain down to the deaerator's pressure, feeding it in directly rather than pumping it forward.</li>
+      <li><span class="eq-instance-name">Valve G</span>, G2 to G3: h<sub>G3</sub> = h<sub>G2</sub>. Drops FWH1's drain down to condenser pressure, flashing part of it to vapor as it enters.</li>
+    </ul>
+  </article>
+
+  <!-- ================= MIXING JUNCTIONS ================= -->
+  <article class="eq-component">
+    <h3>Mixing junctions</h3>
+    <p>
+      Whenever two feedwater streams rejoin, such as a heater's returning drain
+      mixing back into the main feedwater line, the junction is a simple
+      adiabatic control volume with no work: conservation of mass, plus the
+      First Law's conservation of energy, applied at a point, the same
+      mixing-chamber analysis used any time two streams combine in a
+      control-volume problem (Moran et al., Ch. 4).
+    </p>
+    <div class="eq-formula">ṁ<sub>out</sub>·h<sub>out</sub> = Σ ṁ<sub>in</sub>·h<sub>in</sub></div>
+
+    <p class="eq-subhead">Every mixing junction in this plant:</p>
+    <ul class="eq-instances">
+      <li>
+        <span class="eq-instance-name">M1</span>, produces state 8 (FWH2's tube inlet): combines the flow leaving FWH1 (h<sub>7'</sub>, flow flow<sub>FWH2</sub> − f) with Pump F's drain (F3, flow f).
+        <div class="eq-formula">h<sub>8</sub> = [(flow<sub>FWH2</sub> − f)·h<sub>7'</sub> + f·h<sub>F3</sub>] / flow<sub>FWH2</sub></div>
+      </li>
+      <li>
+        <span class="eq-instance-name">M2</span>, produces state 9 (FWH3's tube inlet): combines the flow leaving FWH2 (h<sub>8'</sub>) with Pump E's drain (E3, flow e). Solved together with FWH3's own heating balance:
+        <div class="eq-formula">h<sub>9</sub> = h<sub>10</sub> − e·(h<sub>E1</sub> − h<sub>E2</sub>) / flow<sub>FWH3</sub></div>
+      </li>
+      <li>
+        The deaerator itself produces state 11 the same way (it's an open feedwater heater, so mixing is its whole job) - the numbering just skips from M2 to M4 because the deaerator isn't a separate M3 node in the code, it <em>is</em> the mixing point. Described under "Open feedwater heater" above.
+      </li>
+      <li>
+        <span class="eq-instance-name">M4</span>, produces state 13 (FWH5's tube inlet): combines the flow leaving FWH4 with Pump B's drain (B3, flow b), flow (ṁ−a) total. Streams A and B are solved together in closed form (see the Reheater section above), so the coded formula is expressed via FWH5's own outlet h<sub>13'</sub> rather than FWH4's directly, but it's the same mixing point:
+        <div class="eq-formula">h<sub>13</sub> = h<sub>13'</sub> − b·(h<sub>B1</sub> − h<sub>B2</sub>) / (ṁ − a)</div>
+      </li>
+      <li>
+        <span class="eq-instance-name">M5</span>, produces state 14 (FWH6's tube inlet): combines the flow leaving FWH5 (h<sub>13'</sub>, flow ṁ−a) with Pump A's drain (A5, flow a).
+        <div class="eq-formula">h<sub>14</sub> = [(ṁ − a)·h<sub>13'</sub> + a·h<sub>A5</sub>] / ṁ</div>
+      </li>
+    </ul>
+  </article>
+
+  <!-- ================= GENERATOR ================= -->
+  <article class="eq-component">
+    <h3>Generator</h3>
+    <p>
+      Not a thermodynamic control volume at all, and not derived from either
+      law: just a real-world mechanical-to-electrical conversion efficiency
+      that most idealized cycle problems skip entirely, since the shaft work
+      the turbines produce isn't all delivered as electricity.
+    </p>
+    <div class="eq-formula">W<sub>net</sub> = (W<sub>turbines</sub> − W<sub>pumps</sub>)·η<sub>generator</sub></div>
+  </article>
+
+  <!-- ================= CYCLE PERFORMANCE ================= -->
+  <article class="eq-component">
+    <h3>Cycle performance</h3>
+    <p>
+      The first-law (thermal) efficiency is the same Rankine-cycle efficiency
+      definition from any thermodynamics textbook: net work out divided by heat
+      in, straight from conservation of energy (Moran et al., Ch. 8).
+    </p>
+    <div class="eq-formula">η<sub>1st law</sub> = W<sub>net</sub> / <span class="q-rate">Q</span></div>
+    <p>
+      The second-law (exergetic) efficiency compares the net work out to the
+      exergy, or maximum possible work, that was actually available to extract.
+      Exergy is the flow-availability function from the second-law chapter of a
+      thermo course, measured relative to a fixed ambient dead state
+      (h<sub>0</sub>, s<sub>0</sub>, T<sub>0</sub>), and it exists as a concept
+      at all because of the Second Law: no real process can convert 100% of a
+      heat input into work, so exergy tracks the upper bound that's actually
+      achievable rather than the full energy content (Moran et al., Ch. 7):
+    </p>
+    <div class="eq-formula">ψ = (h − h<sub>0</sub>) − T<sub>0</sub>·(s − s<sub>0</sub>)</div>
+    <p>Applied across the boiler, the dead-state terms cancel out of the difference, leaving the exergy the steam itself gains:</p>
+    <div class="eq-formula">Ex<sub>steam</sub> = ṁ·[(h<sub>1</sub> − h<sub>15</sub>) − T<sub>0</sub>·(s<sub>1</sub> − s<sub>15</sub>)]</div>
+    <p>
+      Ex<sub>steam</sub> only sees the steam's own states, so it has no way to
+      notice <em>how</em> irreversibly that heat was actually delivered - a
+      slider change that forces the boiler to heat much colder feedwater (e.g.
+      bypassing every FWH) can make W<sub>net</sub> / Ex<sub>steam</sub> look
+      better even though the plant is strictly worse, because cutting the FWHs'
+      own mixing losses can outweigh the (invisible, to Ex<sub>steam</sub>)
+      extra irreversibility of the wider-ΔT boiler heat exchange.
+    </p>
+    <p>
+      Plain first-law efficiency never has this loophole - <span class="q-rate">Q</span> is <span class="q-rate">Q</span> no matter how it's delivered - which is why a whole-plant
+      second-law efficiency is conventionally referenced against the exergy of
+      the resource actually supplying the heat, not the exergy of whatever
+      happens to receive it (Moran et al., Ch. 7, draws exactly this
+      distinction between a component's own second-law efficiency and a
+      plant's, which is referenced to its fuel or heat source). Pricing the
+      same heat against the intermediate loop's own temperature glide fixes it
+      here. The exergy a stream gives up delivering heat δQ at its own local
+      temperature T is (1 − T<sub>0</sub>/T)·δQ, so integrating over the
+      intermediate loop's full cooldown from T<sub>in</sub> to T<sub>out</sub> gives
+      the total exergy it gives up:
+    </p>
+    <div class="eq-formula">Ex<sub>source</sub> = ∫ (1 − T<sub>0</sub>/T)·δ<span class="q-rate">Q</span>, integrated from T<sub>in</sub> to T<sub>out</sub></div>
+    <p>
+      For a stream of roughly constant cp (a fair assumption for solar salt over a
+      60 °C span with no phase change), δ<span class="q-rate">Q</span> = −ṁcp·dT, and that integral
+      works out in closed form to <span class="q-rate">Q</span>·(1 − T<sub>0</sub>/T<sub>lm</sub>), where
+      T<sub>lm</sub> is the log-mean (entropic-average, not arithmetic-average)
+      temperature - the same log-mean-temperature-difference logic from a
+      heat-transfer course, applied here to exergy instead of heat rate. This
+      needs only the two supply/return temperatures and the duty, not the
+      stream's mass flow or its actual cp value:
+    </p>
+    <div class="eq-formula">T<sub>lm</sub> = (T<sub>in</sub> − T<sub>out</sub>) / ln(T<sub>in</sub>/T<sub>out</sub>)</div>
+    <div class="eq-formula">Ex<sub>source</sub> = <span class="q-rate">Q</span>·(1 − T<sub>0</sub>/T<sub>lm</sub>)</div>
+    <p>
+      T<sub>in</sub> and T<sub>out</sub> are the intermediate (solar-salt)
+      loop's own supply and return temperatures at the steam generator: 565 °C
+      and 505 °C (Colliva et al. 2024, Table 1 - the source paper's own
+      intermediate fluid is FLiBe rather than solar salt, but its supply/return
+      temperatures are what this plant's secondary heat exchangers are sized
+      to, regardless of which fluid carries them; see the sources list). That
+      puts T<sub>lm</sub> at 807.7 K (534.6 °C) and the Carnot factor
+      1 − T<sub>0</sub>/T<sub>lm</sub> at 0.631 for a 25 °C ambient - the
+      ceiling every cycle's second-law efficiency is measured against below.
+      Ex<sub>source</sub> doesn't depend on any steam-side slider at all, only on <span class="q-rate">Q</span> and ambient
+      T<sub>0</sub>, so it can't be gamed by changing how the feedwater arrives.
+      Second-law efficiency is computed against it instead of Ex<sub>steam</sub>:
+    </p>
+    <div class="eq-formula">η<sub>2nd law</sub> = W<sub>net</sub> / Ex<sub>source</sub></div>
+    <p>
+      T<sub>0</sub> is the ambient temperature (in kelvin). This splits the
+      total exergy destroyed into two pieces: how much was lost transferring
+      heat from the primary loop into the steam itself (a real irreversibility
+      this model didn't track at all before), and how much was lost downstream
+      of that, in the turbines, condenser, pumps, and FWH mixing:
+    </p>
+    <div class="eq-formula">Irr<sub>steam generator</sub> = Ex<sub>source</sub> − Ex<sub>steam</sub></div>
+    <div class="eq-formula">Irr<sub>cycle</sub> = Ex<sub>steam</sub> − W<sub>net</sub></div>
+    <p>
+      Both are pure Second Law quantities, each proportional to the entropy
+      generated in its own piece of the plant (the Gouy-Stodola theorem,
+      Irr = T<sub>0</sub>·S<sub>gen</sub>), and the Second Law guarantees
+      neither can come out negative, no matter how the sliders are set. Total
+      exergy destroyed, consistent with η<sub>2nd law</sub>, is just their sum:
+    </p>
+    <div class="eq-formula">Irr = Ex<sub>source</sub> − W<sub>net</sub> = Irr<sub>steam generator</sub> + Irr<sub>cycle</sub></div>
+  </article>
+
+  <!-- ================= EVERY MONITORING VALUE ================= -->
+  <article class="eq-component">
+    <h3>Every monitoring value on the dashboard</h3>
+    <p>
+      The gauges, readout cards, and the condenser helper line above are all
+      built from the component equations already given. This lists each
+      displayed value by its exact label and its formula, so any number on the
+      dashboard can be traced back to how it was found.
+    </p>
+
+    <p class="eq-subhead">Gauges</p>
+    <ul class="eq-instances">
+      <li><span class="eq-instance-name">1st law efficiency</span>: η<sub>1st law</sub> = W<sub>net</sub> / <span class="q-rate">Q</span></li>
+      <li><span class="eq-instance-name">2nd law efficiency</span>: η<sub>2nd law</sub> = W<sub>net</sub> / Ex<sub>source</sub></li>
+      <li><span class="eq-instance-name">LP exhaust quality</span>: x<sub>5</sub>, or 1 (full quality) if the exhaust came out superheated instead of wet</li>
+      <li><span class="eq-instance-name">Pump power fraction</span>: W<sub>pumps</sub> / W<sub>turbines</sub></li>
+    </ul>
+
+    <p class="eq-subhead">Readout cards</p>
+    <ul class="eq-instances">
+      <li><span class="eq-instance-name">Net electrical output</span>: W<sub>net</sub> = (W<sub>turbines</sub> − W<sub>pumps</sub>)·η<sub>generator</sub></li>
+      <li>
+        <span class="eq-instance-name">Turbine work</span>: W<sub>turbines</sub> = W<sub>HP</sub> + W<sub>IP</sub> + W<sub>LP</sub>, the sum of each turbine section's own work
+        <div class="eq-formula">W<sub>HP</sub> = (ṁ−a)·h<sub>1</sub> − (ṁ−a−b)·h<sub>2</sub> − b·h<sub>B1</sub></div>
+        <div class="eq-formula">W<sub>IP</sub> = (ṁ−a−b)·h<sub>3</sub> − (ṁ−a−b−c−d)·h<sub>4</sub> − c·h<sub>C1</sub> − d·h<sub>D1</sub></div>
+        <div class="eq-formula">W<sub>LP</sub> = (ṁ−a−b−c−d)·h<sub>4</sub> − flow<sub>cond</sub>·h<sub>5</sub> − e·h<sub>E1</sub> − f·h<sub>F1</sub> − g·h<sub>G1</sub></div>
+      </li>
+      <li><span class="eq-instance-name">Feedwater pump power</span>: W<sub>fwp</sub> = (ṁ−a−b)·(h<sub>12</sub> − h<sub>11</sub>)</li>
+      <li><span class="eq-instance-name">Condensate pump power</span>: W<sub>condpump</sub> = flow<sub>FWH1</sub>·(h<sub>7</sub> − h<sub>6</sub>)</li>
+      <li><span class="eq-instance-name">Circulating pump power</span>: W<sub>cwpump</sub> = ṁ<sub>cw</sub>·(h<sub>cw,out</sub> − h<sub>cw,in</sub>)</li>
+      <li><span class="eq-instance-name">Exergy to working fluid</span>: Ex<sub>steam</sub> = ṁ·[(h<sub>1</sub> − h<sub>15</sub>) − T<sub>0</sub>·(s<sub>1</sub> − s<sub>15</sub>)]</li>
+      <li><span class="eq-instance-name">Total steam flow</span>: ṁ = <span class="q-rate">Q</span> / (h<sub>1</sub> − h<sub>15</sub>)</li>
+      <li><span class="eq-instance-name">Circulating water flow</span>: ṁ<sub>cw</sub> = r<sub>cw</sub>·ṁ, where r<sub>cw</sub> is the circulating-water-to-steam mass ratio slider</li>
+      <li><span class="eq-instance-name">Condenser pressure</span>: P<sub>6</sub> = P<sub>sat</sub>(T<sub>6</sub>), the converged condenser saturation pressure from the trial loop above</li>
+      <li><span class="eq-instance-name">Condenser TTD</span>: TTD<sub>cond,eff</sub> = T<sub>6</sub> − T<sub>cw,out</sub>, where T<sub>cw,out</sub> = T<sub>cw,in</sub> + Q<sub>cond</sub>/(ṁ<sub>cw</sub>·cp<sub>cw</sub>)</li>
+      <li><span class="eq-instance-name">Hotwell temperature</span>: T<sub>6</sub>, the converged condenser saturation temperature</li>
+      <li><span class="eq-instance-name">Cooling tower basin temp</span>: T<sub>cw,in</sub> = T<sub>wb</sub> + approach</li>
+    </ul>
+
+    <p class="eq-subhead">Condenser helper line (shown under the Cooling / Environment sliders)</p>
+    <ul class="eq-instances">
+      <li><span class="eq-instance-name">NTU</span>: NTU = UA / (ṁ<sub>cw</sub>·cp<sub>cw</sub>)</li>
+      <li><span class="eq-instance-name">ε</span>: ε = 1 − e<sup>−NTU</sup></li>
+      <li><span class="eq-instance-name">Range</span>: ΔT<sub>cw</sub> = Q<sub>cond</sub> / (ṁ<sub>cw</sub>·cp<sub>cw</sub>), the circulating-water temperature rise across the condenser</li>
+      <li><span class="eq-instance-name">TTD</span>: same as the condenser TTD readout card above</li>
+    </ul>
+  </article>
+
+  <!-- ================= SOURCES ================= -->
+  <article class="eq-component">
+    <h3>Sources</h3>
+    <p>
+      The component models above follow standard undergraduate thermodynamics
+      and heat-transfer texts. Steam properties come from the IAPWS-95
+      formulation, accessed through CoolProp.
+    </p>
+    <ol class="eq-sources">
+      <li>M. J. Moran, H. N. Shapiro, D. D. Boettner, M. B. Bailey, <em>Fundamentals of Engineering Thermodynamics</em>, 8th ed., Wiley. Turbine and pump isentropic efficiency, the Rankine cycle, open and closed feedwater heaters, throttling valves, and mixing chambers (Ch. 4-6, 8); exergy analysis (Ch. 7).</li>
+      <li>Y. A. Çengel, M. A. Boles, <em>Thermodynamics: An Engineering Approach</em>. Alternate standard reference for the same topics.</li>
+      <li>F. P. Incropera, D. P. DeWitt, T. L. Bergman, A. S. Lavine, <em>Fundamentals of Heat and Mass Transfer</em>. The ε-NTU heat-exchanger effectiveness method used for the condenser.</li>
+      <li>R. Stull, "Wet-Bulb Temperature from Relative Humidity and Air Temperature," <em>Journal of Applied Meteorology and Climatology</em> 50, 2267-2269 (2011). The wet-bulb correlation used for the cooling tower.</li>
+      <li>W. Wagner, A. Pruß, "The IAPWS Formulation 1995 for the Thermodynamic Properties of Ordinary Water Substance for General and Scientific Use," <em>Journal of Physical and Chemical Reference Data</em> 31, 387-535 (2002). The steam-table property source for every enthalpy, entropy, and temperature lookup in this model.</li>
+      <li>I. H. Bell, J. Wronski, S. Quoilin, V. Lemort, "Pure and Pseudo-pure Fluid Thermophysical Property Evaluation and the Open-Source Thermophysical Property Library CoolProp," <em>Industrial &amp; Engineering Chemistry Research</em> 53(6), 2498-2508 (2014). The software library implementing IAPWS-95 that every property lookup in this simulator runs through.</li>
+      <li>F. Colliva, C. Ciurluini, A. Iaboni, G. V. Centomani, A. Trotta, F. Giannetti, "Analysis of Power Conversion System Options for ARC-like Tokamak Fusion Reactor Balance of Plant," <em>Sustainability</em> 16, 7480 (2024). This cycle's layout, extraction pressures, and operating conditions; the intermediate loop's 565/505 °C supply/return and 645 MW<sub>th</sub> duty, shared by all three power conversion cycles on this site. That paper's own intermediate fluid is FLiBe rather than the solar salt used here - the temperatures and duty still apply (see the MANTA reference below), but its stated 1500 kg/s intermediate mass flow is per primary train (there are three) and isn't the figure this site's solar-salt loop would use, since FLiBe and solar salt have different heat capacities.</li>
+      <li>MANTA Collaboration, "MANTA: A Negative-Triangularity NASEM-Compliant Fusion Pilot Plant," arXiv:2405.20243 (2024). The choice of 60% NaNO<sub>3</sub>/40% KNO<sub>3</sub> solar salt as the intermediate loop's working fluid, selected so its boiling and recrystallization points bracket both heat exchangers' hot and cold legs.</li>
+      <li>F. Colliva et al., "Conceptual design and supporting analysis of a Double Wall Heat Exchanger for an ARC-class fusion reactor Primary Cooling System," <em>Fusion Engineering and Design</em> 201, 114261 (2024). Background on the FLiBe primary loop and blanket-side double-wall heat exchanger, upstream of everything this simulator actually models - it's mentioned above only for context on why the intermediate loop exists as a separate stream.</li>
+    </ol>
+  </article>
+</div>
+
+<style>
+  .eq-wrap {
+    font-family: var(--font-display);
+    color: var(--paper);
+    margin-top: 8px;
+    margin-bottom: 40px;
+  }
+
+  .eq-wrap > .page-title {
+    max-width: 1028px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .eq-intro {
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--ink-dim);
+    font-weight: 500;
+    max-width: 1028px;
+    margin: 0 auto 14px;
+  }
+  .eq-intro sub { font-weight: 700; }
+
+  .eq-component {
+    position: relative;
+    max-width: 1028px;
+    margin: 0 auto;
+    padding: 30px 0;
+  }
+  .eq-component:last-child { padding-bottom: 0; }
+
+  /* engraved-groove section divider: dark line + bright highlight, like a machined seam */
+  .eq-component:not(:first-child)::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 2%;
+    right: 2%;
+    height: 4px;
+    background: linear-gradient(
+      to bottom,
+      rgba(10, 11, 13, 0.22) 0%, rgba(10, 11, 13, 0.22) 60%,
+      rgba(255, 255, 255, 0.55) 60%, rgba(255, 255, 255, 0.55) 100%
+    );
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+  }
+
+  .eq-component h3 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--paper);
+    margin: 0 0 12px;
+  }
+
+  .eq-component p {
+    font-size: 14.5px;
+    line-height: 1.7;
+    color: var(--ink-dim);
+    font-weight: 500;
+    margin: 0 0 12px;
+  }
+  .eq-component p:last-child { margin-bottom: 0; }
+  .eq-used { font-style: italic; }
+
+  .eq-subhead {
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--paper);
+    margin: 20px 0 10px;
+  }
+
+  .eq-formula {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--teal-dim);
+    line-height: 1.9;
+    letter-spacing: 0.01em;
+    margin: 4px 0 14px 6px;
+  }
+  .eq-formula.eq-wrap-tight { line-height: 1.7; margin-bottom: 14px; }
+
+  /* Q̇'s combining dot (U+0307) sits almost flush with the cap-height on most
+     fonts - barely visible, unlike ṁ's, which has a lowercase letter's extra
+     headroom to sit in. Drawn as an absolutely-positioned pseudo-element
+     instead, so the Q itself stays in normal inline flow (same baseline as
+     surrounding text, no per-font vertical-align tuning) and the dot just
+     floats above it. */
+  .q-rate {
+    position: relative;
+    display: inline-block;
+  }
+  .q-rate::before {
+    content: '•';
+    position: absolute;
+    top: -0.5em;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.5em;
+    line-height: 1;
+  }
+
+  /* same engraved-groove technique as the section divider, thinner and lighter */
+  .eq-instances li,
+  .eq-sources li {
+    position: relative;
+  }
+  .eq-instances li:not(:first-child)::before,
+  .eq-sources li:not(:first-child)::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+      to bottom,
+      rgba(10, 11, 13, 0.14) 0%, rgba(10, 11, 13, 0.14) 50%,
+      rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0.4) 100%
+    );
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  }
+
+  /* per-component / per-readout instance lists */
+  .eq-instances {
+    list-style: none;
+    margin: 0 0 4px;
+    padding: 0;
+  }
+  .eq-instances li {
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--ink-dim);
+    font-weight: 500;
+    padding: 12px 0;
+  }
+  .eq-instance-name {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--amber-dim);
+  }
+  .eq-instances .eq-formula {
+    margin: 6px 0 2px 0;
+    font-size: 14px;
+  }
+  .eq-instances .eq-formula:last-child { margin-bottom: 0; }
+
+  .eq-sources {
+    margin: 0;
+    padding-left: 22px;
+    display: flex;
+    flex-direction: column;
+  }
+  .eq-sources li {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--ink-dim);
+    font-weight: 500;
+    padding: 10px 0;
+  }
+  .eq-sources li:first-child { padding-top: 0; }
+  .eq-sources em { font-style: italic; color: var(--paper); }
+
+  @media (max-width: 700px) {
+    .eq-component h3 { font-size: 16px; }
+    .eq-formula { font-size: 13px; margin-left: 0; }
+    .eq-instances li { font-size: 13px; }
+  }
+</style>

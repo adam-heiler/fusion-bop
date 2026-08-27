@@ -32,24 +32,86 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       </div>
     </div>
   </section>
+  <div class="hero-bottom-bar"></div>
+
+  <div class="about-box">
+    <figure class="about-photo-fig">
+      <img src="/other_images/me-cooling-tower.jpg" alt="Adam Heiler standing in front of a cooling tower at Nine Mile Point Clean Energy Center" class="about-photo" width="2638" height="3518" />
+      <figcaption class="photo-caption">Me in front of Nine Mile Point Unit 2's 543-foot cooling tower</figcaption>
+    </figure>
+    <div class="about-text">
+      <div class="about-bio">
+        <p class="about-greeting">Hello! I am Adam Heiler</p>
+        <p>I'm a senior mechanical engineering undergraduate student at the University of Michigan, and as I'm sure you can probably tell, I love clean energy and thermodynamics.</p>
+        <p>I have spent these past two summers interning with the Balance of Plant team at Nine Mile Point, a two-unit nuclear power plant on <span class="lake-ontario">Lake Ontario</span> in New York State. I am also the Technical Director of SPARK Electric Racing, University of Michigan's electric motorcycle project team.</p>
+        <p>I love my dogs, exploring new cities, hiking, going to Michigan football games, playing piano, learning guitar, and drumming in Groove Percussion and Performance Group.</p>
+        <p>Enjoy my website!</p>
+      </div>
+      <figure class="ann-arbor-fig">
+        <div class="ann-arbor-frame">
+          <img src="/other_images/ann-arbor.jpg" alt="Ann Arbor and University of Michigan skyline" class="ann-arbor-photo" width="4032" height="972" />
+        </div>
+        <figcaption class="photo-caption">Ann Arbor as seen from Michigan Stadium</figcaption>
+      </figure>
+    </div>
+  </div>
 </BaseLayout>
 
+<script>
+  // "Lake Ontario" highlight: fires once, a few seconds after the bio
+  // scrolls into view, not immediately on entry - re-bound on astro:page-load
+  // since ClientRouter swaps the DOM without a full reload.
+  const HIGHLIGHT_DELAY = 2500; // ms after scrolling into view
+
+  function initLakeOntarioHighlight() {
+    const el = document.querySelector<HTMLElement>('.lake-ontario');
+    if (!el || el.dataset.observed) return;
+    el.dataset.observed = 'true';
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          setTimeout(() => el.classList.add('highlight-active'), HIGHLIGHT_DELAY);
+          io.unobserve(el);
+        }
+      }
+    }, { threshold: 0.6 });
+    io.observe(el);
+  }
+  initLakeOntarioHighlight();
+  document.addEventListener('astro:page-load', initLakeOntarioHighlight);
+</script>
+
 <style>
-  /* full-bleed hero, breaks out of the page padding to sit flush against the nav.
-     overflow hidden stops the spinning bop node glow from growing page height. */
+  /* full-bleed hero; overflow hidden stops the bop node glow from growing page height */
   .hero {
     position: relative;
     overflow: hidden;
-    margin: -24px calc(-50vw + 50%) 0;
+    margin: -24px -24px 0;
     padding: 44px max(24px, calc(50vw - 640px));
     background-image:
-      linear-gradient(0deg, rgba(53, 214, 180, 0.2), rgba(53, 214, 180, 0) 40%),
+      linear-gradient(180deg, rgba(53, 214, 180, 0.11), rgba(53, 214, 180, 0) 88%),
       linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 42%),
-      linear-gradient(163deg, var(--steel-300), var(--steel-600) 85%);
+      linear-gradient(163deg, var(--steel-300), var(--steel-500) 85%);
     background-blend-mode: normal;
     background-size: cover;
     background-position: center;
-    border-bottom: 1px solid var(--hairline);
+  }
+
+  /* brushed-metal strip matching the nav bar's chamfer-panel rim weight */
+  .hero-bottom-bar {
+    height: 16px;
+    margin: 0 -24px;
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 40%),
+      linear-gradient(180deg, var(--steel-650), var(--steel-800)),
+      var(--aluminum);
+    background-repeat: no-repeat, no-repeat, no-repeat;
+    background-size: 100% 100%, 100% 100%, cover;
+    background-position: center, center, center;
+    background-blend-mode: normal, overlay, normal;
+    border-top: 1.5px solid var(--steel-900);
+    border-bottom: 1.5px solid var(--steel-900);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
   }
 
   .hero-heading {
@@ -75,8 +137,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   }
   .hero-fusion { color: var(--paper); }
 
-  /* bop letters flash teal in sequence, looping.
-     longhand animation properties, not the shorthand, so animation-delay isn't reset. */
+  /* longhand animation props, not shorthand, so animation-delay isn't reset */
   .bop-letter {
     display: inline-block;
     color: var(--teal-dim);
@@ -88,15 +149,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   .bop-letter-1 { animation-delay: 0s; }
   .bop-letter-2 { animation-delay: 0.8s; }
   .bop-letter-3 { animation-delay: 1.6s; }
-  /* white flash reads as the letter lighting up instead of vanishing on the light panel.
-     same keyframe shape reused below for the bop node letters. */
+  /* white flash reads as the letter lighting up, not vanishing */
   @keyframes bop-letter-glow {
     0%, 12%, 100% { color: var(--teal-dim); text-shadow: none; }
     6% { color: #ffffff; text-shadow: 0 0 4px var(--teal), 0 0 1px rgba(255, 255, 255, 0.9); }
   }
 
-  /* three equal columns so the bop node stays centered under the heading
-     regardless of the art widths on each side. */
+  /* three equal columns keep the bop node centered regardless of art width */
   .hero-flow {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
@@ -116,10 +175,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     height: clamp(160px, 22vw, 320px);
     flex-shrink: 0;
   }
-  /* powerline art is a narrow crop, sized up so it holds its own against the tokamak.
-     both towers bottom-align to a shared ground line. */
+  /* narrow crop sized up against the tokamak; both towers share a ground line */
   .hero-art-powerline { height: clamp(200px, 27vw, 400px); align-self: flex-end; transform: translateX(-6.77%); }
-  /* second tower is shorter and tucked in close, lifted a bit to read as set further back. */
+  /* shorter, tucked in close, reads as set further back */
   .hero-art-powerline-2 {
     height: clamp(110px, 15vw, 230px);
     align-self: flex-end;
@@ -127,8 +185,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     margin-bottom: clamp(16px, 4vw, 54px);
   }
 
-  /* moving dashed line between the art and the bop node.
-     fixed width so both sides stay the same length. */
+  /* moving dashed line, fixed width so both sides match */
   .flow-pipe {
     flex: none;
     width: clamp(50px, 6vw, 110px);
@@ -142,9 +199,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     to { background-position: 48px 0; }
   }
 
-  /* bop node is a light chamfered plate, landscape shape so the label has room.
-     border is a spinning glow ring peeking through a small gap around the plate,
-     clipped to the same chamfer shape so it never escapes the outline. */
+  /* glow ring peeks through a gap, clipped to the chamfer so it never escapes it */
   .bop-node-frame {
     position: relative;
     flex-shrink: 0;
@@ -239,5 +294,134 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     .bop-node-frame { width: 220px; height: auto; }
     .bop-node { height: auto; padding: 18px 22px; }
     .bop-node-line { font-size: 22px; }
+  }
+
+  /* matches .rankine-align's content width (simulator-box's 1100px minus its 72px padding).
+
+     Bottom alignment, done properly this time: two independently-sized images with
+     preserved aspect ratios cannot be guaranteed to end at the same pixel at every
+     viewport width - the columns don't scale in a fixed ratio to each other (one is
+     capped at 400px, the other fills whatever's left), so no fixed offset or margin
+     trick holds outside the one width it was measured at. The only width-independent
+     fix is to let one image's *frame* be sized by layout (not by its own aspect ratio)
+     and crop into it. The cooling tower photo is never touched - full aspect ratio,
+     always. The Ann Arbor frame instead fills whatever vertical space is left after
+     the bio text, cropping the (already-zoomed) wide panorama via object-fit to match
+     - at any viewport width, automatically, because it's real CSS layout doing the
+     matching instead of a guessed number. */
+  .about-box {
+    display: grid;
+    grid-template-columns: minmax(260px, 400px) minmax(0, 1fr);
+    gap: 28px;
+    align-items: stretch;
+    max-width: 1028px;
+    margin: 32px auto 0;
+  }
+  .about-photo-fig { margin: 0; }
+  .about-photo {
+    width: 100%;
+    height: auto;
+    display: block;
+    border: 1px solid var(--hairline);
+    filter: drop-shadow(0 4px 10px rgba(20, 24, 26, 0.16));
+  }
+  .photo-caption {
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+    color: var(--ink-dim);
+    text-align: center;
+  }
+  .about-text {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    font-family: var(--font-display);
+    color: var(--paper);
+  }
+  .about-bio { flex: none; }
+  .about-bio p {
+    margin: 0 0 14px;
+    line-height: 1.6;
+  }
+  .about-bio p:last-child { margin-bottom: 0; }
+  .about-greeting {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  /* Lake Ontario, not "Lake America" - a highlighter-marker stroke sweeps in
+     behind the name a few seconds after the bio scrolls into view (see script
+     below), then pulses twice to make sure it gets noticed, and stays lit. */
+  .lake-ontario {
+    position: relative;
+    z-index: 0;
+    display: inline-block;
+    white-space: nowrap;
+  }
+  .lake-ontario::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    left: 0;
+    top: 12%;
+    bottom: 2%;
+    width: 0%;
+    background: #ffe135;
+    opacity: 0.75;
+    border-radius: 2px;
+  }
+  .lake-ontario.highlight-active::before {
+    animation:
+      lake-ontario-sweep 1.4s cubic-bezier(0.65, 0, 0.35, 1) forwards,
+      lake-ontario-pulse 1.3s ease-in-out 1.4s 2;
+  }
+  @keyframes lake-ontario-sweep {
+    to { width: 100%; }
+  }
+  @keyframes lake-ontario-pulse {
+    0%, 100% { opacity: 0.75; }
+    50% { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lake-ontario::before { width: 100%; animation: none; }
+  }
+  /* fills whatever height is left in the stretched .about-text column after the bio */
+  .ann-arbor-fig {
+    flex: 1 1 auto;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+  }
+  .ann-arbor-frame {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--hairline);
+    filter: drop-shadow(0 4px 10px rgba(20, 24, 26, 0.16));
+  }
+  .ann-arbor-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* below this, the bio text wraps enough in the narrowed 1fr column to grow taller
+     than the photo, and the alignment guarantee above only holds when the photo is
+     the taller column - measured the actual breakpoint directly (broken from 640px
+     up to ~1050px), not guessed. */
+  @media (max-width: 1060px) {
+    .about-box {
+      grid-template-columns: 1fr;
+      justify-items: center;
+      text-align: left;
+    }
+    .about-photo { max-width: 320px; }
+    .ann-arbor-fig { min-height: 160px; }
   }
 </style>

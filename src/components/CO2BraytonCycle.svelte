@@ -4,8 +4,7 @@
   import { initCO2Solver, solveCO2Async } from '../lib/co2WorkerClient.js';
   import Gauge from './Gauge.svelte';
 
-  // slider defaults follow the ARC study (sustainability-16-07480, tables 8/9).
-  // pressures in MPa, temperatures degC, effectiveness and split in %.
+  // slider defaults follow the ARC study (sustainability-16-07480, tables 8/9)
   const DEFAULTS = {
     P_high: 28, P_mid: 12.8, P_low: 8.5,
     T1: 455, T3: 455, Q: 645,
@@ -33,13 +32,10 @@
   let pc_approach = $state(DEFAULTS.pc_approach);
   let cw_range    = $state(DEFAULTS.cw_range);
 
-  // with no aux-compressor flow, the cycle degenerates to a simple
-  // regenerative brayton, strike "recompression" from the title
+  // with no aux-compressor flow, the cycle is just a regenerative brayton, drop "recompression" from the title
   const isRecompression = $derived(x_aux > 0);
 
-  // pressure ordering: P_high > P_mid > P_low, all MPa. unlike the rankine
-  // chain there are no TTD-style phase boundaries here, so plain synchronous
-  // walking is enough, no solver round trips.
+  // pressure ordering: P_high > P_mid > P_low, all MPa; no phase boundaries here so plain chain-walking suffices
   const GAP = 0.5; // MPa
   const snap = (v: number) => +v.toFixed(2);
 
@@ -153,8 +149,7 @@
   const g3AccentDim = $derived(g3Warn ? '#c0392b' : '#6d4fb0');
   const g4Val = $derived(result ? result.regen_share : 0);   // regeneration share
 
-  // t-s diagram geometry. co2 dome spans s 0.52-2.14 kJ/kg-K, T -56..31degC,
-  // the cycle itself sits at s 1.2-2.8, T 0..600.
+  // t-s diagram geometry: co2 dome spans s 0.52-2.14 kJ/kg-K, T -56..31degC; cycle sits at s 1.2-2.8, T 0..600
   const SVG_W = 500, SVG_H = 370;
   const PL = 46, PR = 10, PT = 12, PB = 36;
   const CW = SVG_W - PL - PR, CH = SVG_H - PT - PB;
@@ -225,13 +220,16 @@
             <div class="slider-label"><span>LP exhaust P (loop low side)</span><span class="slider-value">{P_low} MPa</span></div>
             <input id="c-plow" type="range" min="7.5" max="10" step="0.05" bind:value={P_low} style="--pct: {pct(P_low,7.5,10)}%" onchange={() => onPressureChange('P_low')} />
           </div>
+          <!-- capped at 560 C, not the usual round 600: both passes draw straight from the
+               565 C intermediate solar-salt loop, so going higher would mean heating the CO2
+               above its own heat source - see Ex_source in co2BraytonSolver.js -->
           <div class="slider-row">
             <div class="slider-label"><span>HP turbine inlet T₁</span><span class="slider-value">{T1} °C</span></div>
-            <input id="c-t1" type="range" min="350" max="600" step="5" bind:value={T1} onchange={runSolve} />
+            <input id="c-t1" type="range" min="350" max="560" step="5" bind:value={T1} onchange={runSolve} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>LP turbine inlet T₃ (reheat)</span><span class="slider-value">{T3} °C</span></div>
-            <input id="c-t3" type="range" min="350" max="600" step="5" bind:value={T3} onchange={runSolve} />
+            <input id="c-t3" type="range" min="350" max="560" step="5" bind:value={T3} onchange={runSolve} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>Secondary HTX duty Q</span><span class="slider-value">{Q} MW</span></div>
@@ -433,6 +431,7 @@
             unit="%"
             accent="#35d6b4"
             accentDim="#14b8a6"
+            title="Net work vs. the exergy given up by the intermediate solar-salt loop cooling from 565 to 505 C, not just the exergy the CO2 happens to receive."
           />
           <Gauge
             label="Back-work ratio"
@@ -474,6 +473,18 @@
             <p class="readout-label">Total CO₂ flow</p>
             <p class="readout-value">{fmt(result.mtot, 0)} <span class="readout-unit">kg/s</span></p>
           </div>
+          <div class="readout-card chamfer-panel chamfer-sm" title="Exergy given up by the intermediate solar-salt loop cooling from a fixed 565 to 505 C - independent of every gas-side slider.">
+            <p class="readout-label">Exergy from intermediate loop*</p>
+            <p class="readout-value">{fmt(result.Ex_source / 1e6, 1)} <span class="readout-unit">MW</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm">
+            <p class="readout-label">Exergy to CO₂</p>
+            <p class="readout-value">{fmt(result.Ex_gas / 1e6, 1)} <span class="readout-unit">MW</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm" title="Exergy lost transferring heat from the primary loop into the CO2 across a finite temperature difference - grows the wider that gap gets.">
+            <p class="readout-label">Exergy lost in SHX</p>
+            <p class="readout-value">{fmt(result.Irr_shx / 1e6, 1)} <span class="readout-unit">MW</span></p>
+          </div>
           <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Precooler duty</p>
             <p class="readout-value">{fmt(result.Q_pc / 1e6, 1)} <span class="readout-unit">MW</span></p>
@@ -507,7 +518,7 @@
         <div class="state-wrap chamfer-panel">
           <p class="group-label" style="margin-bottom:5px">Cycle state table</p>
           <table class="state-table">
-            <thead><tr><th>State</th><th>T (°C)</th><th>P (MPa)</th><th>h (kJ/kg)</th><th>s (kJ/kg·K)</th><th>Stream</th></tr></thead>
+            <thead><tr><th>State</th><th>T (°C)</th><th>P (MPa)</th><th class="sym-th">h (kJ/kg)</th><th class="sym-th">s (kJ/kg·K)</th><th>Stream</th></tr></thead>
             <tbody>
               {#each result.stateTable as st}
                 <tr>
@@ -538,9 +549,7 @@
   }
   @media (max-width: 800px) { .brayton-wrap { grid-template-columns: 1fr; } }
 
-  /* independent scroll panes, each column pins to the viewport top and scrolls
-     internally so paging through sliders never carries the diagram out of view.
-     both drop back to normal page flow below the breakpoint. */
+  /* independent scroll panes so paging through sliders never carries the diagram out of view */
   .controls-col, .diagram-col {
     position: sticky;
     top: 16px;
@@ -710,6 +719,10 @@
     text-transform: uppercase; color: var(--ink-dim);
     text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--steel-900);
   }
+  /* h/s are specific (per-mass) properties - capitalizing them reads as the
+     extensive H/S instead, so this column head must not follow the sitewide
+     all-caps label convention */
+  .state-table th.sym-th { text-transform: none; }
   .state-table td {
     font-family: var(--font-mono);
     padding: 4px 8px 4px 0; font-variant-numeric: tabular-nums;
@@ -780,6 +793,7 @@
     margin: 0 0 16px; line-height: 1.3;
   }
 
+  /* hover/active chrome comes from the shared button.chamfer-panel rules in global.css */
   .reset-btn {
     margin-bottom: 16px;
     padding: 8px 16px;
@@ -787,19 +801,7 @@
     font-size: 0.85rem;
     font-weight: 700;
     letter-spacing: 0.03em;
-    color: var(--ink);
-    cursor: pointer;
     border: none;
-    transition: color 0.15s ease, transform 0.15s ease, filter 0.15s ease;
-  }
-  .reset-btn:hover {
-    color: var(--teal-dim);
-    filter: brightness(1.08);
-  }
-  .reset-btn:active {
-    transform: translateY(1px);
-    filter: brightness(0.94);
-    text-shadow: 0 0 8px var(--teal);
   }
   .title-super {
     transition: text-decoration 0.2s, opacity 0.2s, color 0.2s;

@@ -180,8 +180,7 @@
   .controls-col,
   .diagram-col {
     font-family: var(--font-display);
-    /* overrides the grid item default min-width auto, otherwise a wide child
-       can force the 1fr track past its container at narrow viewports. */
+    /* overrides grid item's default min-width auto, else a wide child forces the 1fr track past its container */
     min-width: 0;
   }
 

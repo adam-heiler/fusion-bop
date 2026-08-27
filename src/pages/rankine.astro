@@ -1,23 +1,382 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import RankineCycle from '../components/RankineCycle.svelte';
+import RankineEquations from '../components/RankineEquations.astro';
 ---
 <BaseLayout title="H2O Rankine">
-  <div class="page-container">
-    <h2 class="page-title">H<sub>2</sub>O Rankine Cycle</h2>
+  <section class="rankine-hero">
+    <div class="rankine-align">
+      <div class="title-row">
+        <svg class="molecule" aria-hidden="true" viewBox="0 0 40 30"><defs><pattern id="mol-knob-tex" patternUnits="objectBoundingBox" patternContentUnits="objectBoundingBox" width="1" height="1"><image href="/buttons/knob-silver.png" x="0" y="0" width="1" height="1" preserveAspectRatio="xMidYMid slice"/></pattern></defs><line class="mol-bond" x1="20" y1="14" x2="8" y2="24"/><line class="mol-bond" x1="20" y1="14" x2="32" y2="24"/><circle class="mol-h" cx="8" cy="24" r="4"/><circle class="mol-h" cx="32" cy="24" r="4"/><circle class="mol-o" cx="20" cy="14" r="7"/><circle class="mol-h-tint" cx="8" cy="24" r="4"/><circle class="mol-h-tint" cx="32" cy="24" r="4"/><circle class="mol-o-tint" cx="20" cy="14" r="7"/><text class="mol-label mol-label-h" x="8" y="24">H</text><text class="mol-label mol-label-h" x="32" y="24">H</text><text class="mol-label mol-label-o" x="20" y="14">O</text></svg>
+        <h2 class="page-title">Supercritical H<sub>2</sub>O Reheat Regenerative Rankine Cycle</h2>
+      </div>
+      <div class="scroll-hint">
+        <span>Scroll for simulator</span>
+        <svg class="scroll-hint-arrow" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <polyline points="3,6 8,11 13,6" />
+        </svg>
+      </div>
+      <div class="cycle-intro">
+        <p>
+          Ah, the good old Rankine cycle. It is used extensively in thermal power stations,
+          like nuclear fission, coal, oil, combined-cycle natural gas, and even
+          concentrated solar power (CSP). Often boiled down to (pun not intended) boiling water
+          to spin a turbine, the simplest form of the Rankine cycle is just four components
+          in a loop: [1] a boiler adds heat at constant pressure, [2] a turbine expands the resulting steam
+          to produce work, [3] a condenser rejects heat at constant pressure back to
+          saturated liquid, and [4] a pump raises the liquid back to boiler
+          pressure. Below you will find that an applied Rankine cycle is far from simple.
+        </p>
+        <p>
+          <strong>Supercritical</strong> means the boiler pressure is pushed
+          above water's critical pressure of 22.064 MPa. Above this pressure, there is no separate liquid and
+          vapor phase and no flat constant-temperature plateau. This allows the boiler to add heat at a higher average
+          temperature than a subcritical boiler. Supercritical Rankine
+          cycles have been employed in coal plants for about as long as nuclear fission
+          has been on the grid (the 1950s), however nuclear fission plants have never used supercritical
+          Rankine cycles due to relatively low reactor operating temperatures and stress corrosion cracking concerns.
+          Fusion may be a different story.
+        </p>
+        <p>
+          <strong>Reheat</strong> means the steam isn't expanded from boiler
+          pressure all the way down to condenser pressure in one turbine. Expansion is split
+          into stages with reheating. After the HP turbine drops the pressure partway,
+          the steam runs back through a reheater and picks up more heat before
+          continuing through the IP and LP turbines. This keeps the LP
+          turbine's exhaust quality from getting too low, which would erode its blades. The second high-temperature heat-addition step also raises efficiency and output.
+        </p>
+        <p>
+          <strong>Regenerative</strong> means some of the steam is bled off the
+          turbines at several pressures and used to preheat the feedwater before reaching the boiler. The model below
+          accomplishes this through six closed feedwater heaters and one deaerator. Without regeneration, relatively cold
+          water straight out of the condenser would be dumped directly into the steam generator, a large and wasteful
+          temperature mismatch. We hate that. Preheating the feedwater first means the boiler only must add heat over a smaller, hotter temperature range, reducing entropy generation and greatly
+          improving efficiency.
+        </p>
+      </div>
+    </div>
+  </section>
+  <div class="hero-bottom-bar"></div>
+  <div class="rankine-align diagram-title-row">
+    <h3 class="page-title">Supercritical H<sub>2</sub>O Reheat Regenerative Rankine Cycle Diagram</h3>
   </div>
   <div class="page-breakout">
     <img class="cycle-diagram diagram-rankine" src="/diagrams/fusion-rankine.png" alt="Process flow diagram of the supercritical reheat regenerative Rankine cycle balance of plant" width="2457" height="1052" />
   </div>
+  <p class="rankine-align diagram-credit">
+    Cycle layout adapted from
+    Colliva, F.; Ciurluini, C.; Iaboni, A.; Centomani, G.V.; Trotta, A.; Giannetti, F.
+    "Analysis of Power Conversion System Options for ARC-like Tokamak Fusion Reactor
+    Balance of Plant." <em>Sustainability</em> <strong>2024</strong>, <em>16</em>, 7480. <a href="https://doi.org/10.3390/su16177480" target="_blank" rel="noopener noreferrer">doi.org/10.3390/su16177480</a>
+  </p>
+  <div class="hero-bottom-bar sim-intro-bar"></div>
+  <div class="rankine-align sim-intro">
+    <h3 class="page-title">Introducing the Simulator</h3>
+    <p>
+      Below is a live model of the cycle shown above. Move any slider and the
+      whole system re-solves from scratch using IAPWS-95 steam properties
+      through CoolProp. See the "Modeling Details" section below the simulator
+      to learn more about the equations the simulator uses.
+    </p>
+    <p>
+      Both the left and the right sides scroll independently.
+      On the left, you will find adjustable sliders categorized within different dropdown
+      menus. This is your side to tinker. On the right, you will find a T-s diagram of the
+      cycle, along with many indicators. Some may glow red if taken out of recommended operating
+      conditions. Scroll down on the right to see the temperature, pressure, specific enthalpy, specific
+      entropy, and mass flow rate of each state.
+    </p>
+  </div>
+  <div class="try-things">
+    <svg class="try-things-border" aria-hidden="true">
+      <polygon />
+    </svg>
+    <h4 class="sim-intro-subhead">Try these things!</h4>
+    <ul class="sim-tips">
+      <li>
+        Open the "Steam Conditions" dropdown.
+        Drop the steam generator outlet pressure (P<sub>1</sub>) below 22 MPa. What happens to the curve? Is the cycle still supercritical?
+      </li>
+      <li>
+        Open the "Extraction Pressures and Feedwater Heating" dropdown.
+        Bypass all feedwater heating. What happens to First and Second Law efficiency?
+        What about LP exhaust quality?
+      </li>
+      <li>
+        Open the "Isentropic Efficiencies" dropdown and adjust turbine efficiencies.
+        Observe how the shape of the cycle curve changes.
+      </li>
+      <li>
+        Here's an interesting one:
+        Open the "Cooling / Environment" dropdown. Push the ambient temperature up. What happens to condenser
+        pressure? Do First Law and Second Law efficiency change by the same amount, or even
+        in the same direction? Why?
+      </li>
+    </ul>
+  </div>
   <div class="simulator-box chamfer-panel chamfer-all">
-    <!-- plain div, not RankineCycle directly. astro's own astro-island wrapper
-         is display:contents, so chamfer-panel's z-index promotion no-ops on it. -->
+    <!-- wrapper needed: astro-island is display:contents, chamfer-panel's z-index promotion no-ops without it -->
     <div><RankineCycle client:load /></div>
   </div>
+  <RankineEquations />
 </BaseLayout>
 
+<script>
+  // chamfered border, drawn once when "Try these things!" scrolls into view,
+  // then left drawn - re-bound on astro:page-load since ClientRouter swaps the
+  // DOM without a full reload.
+  //
+  // The polygon is sized in real pixels (not a stretched 0-100 viewBox) because
+  // a non-square box scaled non-uniformly distorts vector-effect:non-scaling-stroke
+  // at the corners - sizing it to the box's actual dimensions avoids that.
+  const CHAMFER = 14; // px, matches --chamfer in global.css
+
+  function sizeTryThingsBorder() {
+    const wrap = document.querySelector('.try-things');
+    const svg = wrap?.querySelector('.try-things-border');
+    const poly = svg?.querySelector('polygon');
+    if (!wrap || !svg || !poly) return;
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    if (!w || !h) return;
+    const cf = Math.min(CHAMFER, w / 2, h / 2);
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    poly.setAttribute('points', [
+      [cf, 0], [w - cf, 0], [w, cf], [w, h - cf],
+      [w - cf, h], [cf, h], [0, h - cf], [0, cf],
+    ].map(p => p.join(',')).join(' '));
+    poly.setAttribute('pathLength', '1');
+  }
+
+  function initTryThingsBorder() {
+    const el = document.querySelector<HTMLElement>('.try-things');
+    if (!el) return;
+    sizeTryThingsBorder();
+    if (!el.dataset.observed) {
+      el.dataset.observed = 'true';
+      new ResizeObserver(sizeTryThingsBorder).observe(el);
+      if (!el.classList.contains('in-view')) {
+        const io = new IntersectionObserver((entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              el.classList.add('in-view');
+              io.unobserve(el);
+            }
+          }
+        }, { threshold: 0.3 });
+        io.observe(el);
+      }
+    }
+  }
+  initTryThingsBorder();
+  document.addEventListener('astro:page-load', initTryThingsBorder);
+</script>
+
 <style>
-  /* sized off native resolution like the other cycle pages. rankine has roughly
-     twice the equipment of the other two, hence the wider cap. */
+  /* wider cap than the other cycle pages: this plant has ~2x the equipment */
   .diagram-rankine { max-width: 1560px; }
+
+  /* matches simulator-box's content width (1100px box - 72px padding) */
+  .rankine-align {
+    max-width: 1028px;
+    margin: 0 auto;
+  }
+
+  /* full-bleed teal-fade hero, same recipe as the homepage */
+  .rankine-hero {
+    position: relative;
+    overflow: hidden;
+    margin: -24px -24px 0;
+    padding: 40px max(24px, calc(50vw - 640px)) 32px;
+    background-image:
+      linear-gradient(180deg, rgba(53, 214, 180, 0.11), rgba(53, 214, 180, 0) 88%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 42%),
+      linear-gradient(163deg, var(--steel-300), var(--steel-500) 85%);
+    background-blend-mode: normal;
+    background-size: cover;
+    background-position: center;
+  }
+
+  /* single large decorative H2O molecule flanking the title, solid filled atoms labeled H/O */
+  /* title-row is just a positioning anchor: the molecule is absolutely
+     positioned into the left margin so it never shifts the title text,
+     which stays flush with the same left edge as the rest of the page. */
+  .title-row {
+    position: relative;
+  }
+  /* this page's own identity gets a bigger title than section headings like "Cycle Diagram" */
+  .title-row .page-title {
+    font-size: 30px;
+  }
+  .molecule {
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-right: 14px;
+    width: 112px;
+    height: auto;
+    opacity: 0.95;
+  }
+  @media (max-width: 1220px) {
+    .molecule { display: none; }
+  }
+  .molecule .mol-bond { stroke: var(--steel-900); stroke-width: 2.5; stroke-linecap: round; }
+  .molecule .mol-h { fill: url(#mol-knob-tex); }
+  .molecule .mol-o { fill: url(#mol-knob-tex); }
+  /* same teal wash the slider thumbs lay over their knob texture, so the atoms read as the site's metal, not raw chrome */
+  .molecule .mol-h-tint { fill: var(--teal); opacity: 0.5; pointer-events: none; }
+  .molecule .mol-o-tint { fill: var(--teal-dim); opacity: 0.6; pointer-events: none; }
+  .molecule .mol-label {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    fill: #ffffff;
+    text-anchor: middle;
+    dominant-baseline: central;
+  }
+  .molecule .mol-label-o { font-size: 7.5px; }
+  .molecule .mol-label-h { font-size: 5px; }
+
+  .scroll-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 2px 0 18px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--teal-dim);
+  }
+  .scroll-hint-arrow {
+    fill: none;
+    stroke: var(--teal-dim);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .cycle-intro {
+    margin-top: 4px;
+  }
+  .cycle-intro p {
+    font-family: var(--font-display);
+    font-size: 14.5px;
+    line-height: 1.7;
+    color: var(--ink-dim);
+    font-weight: 500;
+    margin: 0 0 12px;
+  }
+  .cycle-intro p:last-child { margin-bottom: 0; }
+  .cycle-intro strong { color: var(--paper); font-weight: 700; }
+
+  /* brushed-metal strip matching the nav bar's chamfer-panel rim weight */
+  .hero-bottom-bar {
+    height: 16px;
+    margin: 0 -24px;
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 40%),
+      linear-gradient(180deg, var(--steel-650), var(--steel-800)),
+      var(--aluminum);
+    background-repeat: no-repeat, no-repeat, no-repeat;
+    background-size: 100% 100%, 100% 100%, cover;
+    background-position: center, center, center;
+    background-blend-mode: normal, overlay, normal;
+    border-top: 1.5px solid var(--steel-900);
+    border-bottom: 1.5px solid var(--steel-900);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  /* spacing so the title isn't flush against the bar above */
+  .diagram-title-row {
+    margin-top: 32px;
+  }
+
+  .diagram-credit {
+    margin: 4px auto 28px;
+    font-family: var(--font-display);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ink-dim);
+    font-weight: 500;
+  }
+  .diagram-credit em { font-style: italic; }
+  .diagram-credit a {
+    color: var(--teal-dim);
+    text-decoration: none;
+  }
+  .diagram-credit a:hover { text-decoration: underline; }
+
+  .sim-intro { margin-top: 32px; }
+  .sim-intro .page-title { margin-bottom: 12px; }
+  .sim-intro p {
+    font-family: var(--font-display);
+    font-size: 14.5px;
+    line-height: 1.7;
+    color: var(--ink-dim);
+    font-weight: 500;
+    margin: 0 0 12px;
+  }
+  .sim-intro p:last-of-type { margin-bottom: 0; }
+  /* teal border draws itself once, the first time this scrolls into view (see
+     the script below), then stays put - unlike the homepage's spinning BoP
+     ring, which never stops */
+  .try-things {
+    position: relative;
+    max-width: 1100px;
+    margin: 22px auto 32px;
+    padding: 18px 20px;
+  }
+  .try-things-border {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .try-things-border polygon {
+    fill: none;
+    stroke: var(--teal);
+    stroke-width: 1.5;
+    stroke-dasharray: 1px;
+    stroke-dashoffset: 1px;
+  }
+  .try-things.in-view .try-things-border polygon {
+    animation: try-things-draw 2.4s ease-out 0.4s forwards;
+  }
+  @keyframes try-things-draw {
+    to { stroke-dashoffset: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .try-things-border polygon { stroke-dashoffset: 0; animation: none; }
+  }
+  .try-things .sim-intro-subhead { margin-top: 0; }
+
+  .sim-intro-subhead {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--paper);
+    margin: 22px 0 10px;
+  }
+  .sim-tips {
+    list-style: disc;
+    margin: 0;
+    padding-left: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sim-tips li {
+    display: list-item;
+    font-family: var(--font-display);
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: var(--ink-dim);
+    font-weight: 500;
+  }
+  .sim-tips li::marker { color: var(--teal-dim); }
+  .sim-tips sub { font-weight: 700; }
 </style>

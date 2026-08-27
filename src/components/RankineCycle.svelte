@@ -4,14 +4,12 @@
   import { initSolver, solveCycleAsync, minPCAsync, minPGAsync, maxPEAsync } from '../lib/solverWorkerClient.js';
   import Gauge from './Gauge.svelte';
 
-  // slider defaults, also used by the reset button below. pressures are MPa for
-  // the high-pressure sliders (P1/P_VA/P_B/P2), kPa for the rest. temperatures
-  // in degC, the convention thermo water tables use.
+  // slider defaults (also used by reset); high-P sliders in MPa, rest in kPa, temps in degC
   const DEFAULTS = {
     P1: 25, T1: 540, T3: 500, P2: 6, P4: 500, reheat_dP_pct: 3,
     P_VA: 11.7, P_B: 10, P_C: 750, P_D: 600, P_E: 430, P_F: 220, P_G: 150,
     P_condpump: 650,
-    Q: 1000,
+    Q: 645,
     eta_HP: 0.85, eta_IP: 0.85, eta_LP: 0.85, eta_pump: 0.85, eta_gen: 0.985,
     TTD: 2.8, T0: 25, RH: 50, cw_approach: 3.1,
     // r_cw = circulating-water : steam mass ratio; UA = condenser conductance (MW/K)
@@ -39,6 +37,7 @@
   let eta_pump = $state(DEFAULTS.eta_pump);
   let eta_gen  = $state(DEFAULTS.eta_gen);
   let TTD         = $state(DEFAULTS.TTD);
+  let bypassFWH   = $state(false);
   let T0          = $state(DEFAULTS.T0);
   let RH          = $state(DEFAULTS.RH);
   let cw_approach = $state(DEFAULTS.cw_approach);
@@ -53,8 +52,7 @@
   const PCRIT = 22.064; // MPa
   const isSupercritical = $derived(P1 >= PCRIT);
 
-  // pressure ordering enforcement. required chain: P1 > P_VA > P_B > P2 > P_C >
-  // P_D > P4 > P_E > P_F > P_G, see NOTES.md for why.
+  // required chain: P1 > P_VA > P_B > P2 > P_C > P_D > P4 > P_E > P_F > P_G, see NOTES.md
   const GAP = 1e4; // Pa (10 kPa), minimum enforced separation between chain neighbors
 
   let orderWarning = $state('');
@@ -72,15 +70,13 @@
     return m ? `P<sub>${m[1]}</sub>` : name;
   }
 
-  // minimum P_C keeping FWH4's extraction fraction non-negative.
-  // P_C is kPa in component state, the solver wants Pa.
+  // minimum P_C keeping FWH4's extraction fraction non-negative (state is kPa, solver wants Pa)
   async function minPC(): Promise<number> {
     const pa = await minPCAsync(P_D * 1e3, TTD, eta_pump);
     return pa / 1e3;
   }
 
-  // minimum P_G keeping FWH1's extraction fraction non-negative.
-  // depends on P_condpump, the pressure FWH1's tube side is compressed to.
+  // minimum P_G keeping FWH1's extraction fraction non-negative; depends on P_condpump
   async function minPG(): Promise<number> {
     const T6C_est = result ? result.T6C : (25 + cw_approach + 13);
     const pa = await minPGAsync(T6C_est, TTD, eta_pump, P_condpump * 1e3);
@@ -93,9 +89,7 @@
     return pa / 1e3;
   }
 
-  // chain get/set always operate in pascals internally, regardless of which
-  // unit a slider displays, otherwise ordering comparisons cross two units.
-  // rounding happens in each setter after converting back to the display unit.
+  // chain get/set always operate in pascals internally so ordering comparisons don't cross units
   type Chain = [string, () => number, (v: number) => void, number, number][];
   function getChain(): Chain {
     return [
@@ -140,8 +134,7 @@
     }
     const peMax = await maxPE();
     if (peMax > 0 && P_E > peMax) {
-      // chain bounds and GAP are pascal-scale, peMax came back in kPa (P_E's
-      // own unit), so convert peLo/GAP to kPa here too
+      // chain/GAP are pascal-scale but peMax is kPa (P_E's own unit), convert here
       const [, , , peLo] = chain[chain.findIndex(([n]) => n === 'P_E')];
       P_E = snap(Math.max(peLo / 1e3, peMax - GAP / 1e3));
       reasons.push(`${subLabel('P_E')} (FWH3) lowered to ${P_E} kPa - above this, the shell steam is hotter than the condensate line pressure can keep liquid, so the feedwater would flash to vapor inside the FWH3 tubes.`);
@@ -152,9 +145,7 @@
       }
     }
 
-    // condensate (at P_condpump) mixes directly into the deaerator (at P_D) with
-    // no pump in between, it has to already be at or above deaerator pressure.
-    // unlike the checks above this is a plain comparison, no async call needed.
+    // condensate mixes directly into the deaerator with no pump, so it must be >= P_D
     const pcondMin = P_D + GAP / 1e3;
     if (P_condpump < pcondMin) {
       P_condpump = snap(pcondMin);
@@ -164,8 +155,7 @@
     return reasons;
   }
 
-  // walks the chain from the moved slider, pushes neighbors just enough to
-  // restore ordering, clamped to each slider's own min/max
+  // walks the chain from the moved slider, nudging neighbors to restore ordering
   async function enforceOrder(changed: string) {
     const chain = getChain();
     const idx = chain.findIndex(([name]) => name === changed);
@@ -200,8 +190,7 @@
     }
   }
 
-  // converts component state (MPa/kPa) to the solver's Pa/degC contract.
-  // T1/T3/T0 pass straight through since the solver takes degC directly.
+  // converts component state (MPa/kPa) to the solver's Pa/degC contract
   function params() {
     return {
       P1: P1 * 1e6, T1, T3, P2: P2 * 1e6, P4: P4 * 1e3, reheat_dP_pct,
@@ -211,6 +200,7 @@
       P_condpump: P_condpump * 1e3, Q,
       eta_HP, eta_IP, eta_LP, eta_pump, eta_gen, TTD,
       T0, RH, cw_approach, r_cw, UA: UA * 1e6,   // UA slider is MW/K, solver wants W/K
+      bypassFWH,
       ...FIXED,
     };
   }
@@ -234,6 +224,18 @@
     F1: true, F2: true, F3: true,
     G1: true, G2: true, G3: true,
   });
+
+  // moves a node to document.body on mount; the toast needs this because
+  // .simulator-box (a real DOM ancestor once this component is mounted inside
+  // it) has clip-path set, and clip-path on an ancestor clips position:fixed
+  // descendants the same way overflow:hidden does, regardless of the fixed
+  // element's own viewport-relative positioning - so nothing short of actually
+  // moving the node out from under it keeps the toast from vanishing/clipping
+  // depending on scroll position.
+  function portal(node: HTMLElement) {
+    document.body.appendChild(node);
+    return { destroy() { node.remove(); } };
+  }
 
   // App state
   let loading = $state(true);
@@ -263,8 +265,7 @@
     runSolve();
   }
 
-  // condensate pump discharge pressure moves the same P_G/P_E boundaries TTD
-  // does, since both minPG and maxPE are functions of it
+  // condensate pump discharge pressure moves the same P_G/P_E boundaries as TTD
   async function onCondPumpChange() {
     const reasons = await enforceTTDBoundaries();
     if (reasons.length) flagOrder(reasons.join(' '));
@@ -283,6 +284,7 @@
     eta_pump = DEFAULTS.eta_pump; eta_gen = DEFAULTS.eta_gen;
     TTD = DEFAULTS.TTD; T0 = DEFAULTS.T0; RH = DEFAULTS.RH;
     cw_approach = DEFAULTS.cw_approach; r_cw = DEFAULTS.r_cw; UA = DEFAULTS.UA;
+    bypassFWH = false;
     orderWarning = '';
     if (warnTimeout) clearTimeout(warnTimeout);
     errMsg = null;
@@ -307,8 +309,7 @@
 
   const g4Raw    = $derived(result ? result.W_pumps / result.W_turb : 0);
 
-  // high condenser back-pressure, loss of vacuum. 15 kPa is well above the ~5-10 kPa
-  // design range and roughly matches typical plant alarm setpoints
+  // loss of vacuum alarm; 15 kPa is above the ~5-10 kPa design range
   const condWarn = $derived(!!result && result.P6 / 1000 > 15);
 
   // T-s diagram geometry
@@ -341,12 +342,20 @@
 
 <div class="page-header">
   <h1 class="page-title">
-    <span class="title-super" class:struck={!isSupercritical}>Supercritical</span> H<sub>2</sub>O Rankine Cycle Simulator
+    <span class="title-super" class:struck={!isSupercritical}>Supercritical</span> H<sub>2</sub>O Reheat Regenerative Rankine Cycle Simulator
   </h1>
   <button type="button" class="reset-btn chamfer-panel chamfer-sm" onclick={resetAll} title="Restore every slider to its default value">
     <span>Reset cycle</span>
   </button>
 </div>
+
+<!-- portaled straight to <body>: a position:fixed element still gets clipped by
+     an overflow:auto/hidden OR clip-path ancestor (here, .controls-col and
+     .simulator-box respectively), so it needs zero such ancestors between it
+     and the viewport to reliably float on top regardless of scroll position. -->
+{#if orderWarning}
+  <div class="order-warning chamfer-panel chamfer-sm" use:portal><span>{@html orderWarning}</span></div>
+{/if}
 
 <div class="rankine-wrap">
   {#if loading}
@@ -358,10 +367,6 @@
     <div class="error-banner chamfer-panel chamfer-sm"><span>Solver error: {errMsg}</span></div>
   {:else}
     <div class="controls-col">
-
-      {#if orderWarning}
-        <div class="order-warning chamfer-panel chamfer-sm"><span>{@html orderWarning}</span></div>
-      {/if}
 
       <div class="slider-details chamfer-panel chamfer-sm" class:slider-open={openSections.steam} style="--slider-color: #e8935f; --slider-tint: rgba(232, 147, 95, 0.2); --slider-glow-1: rgba(232, 147, 95, 0.55); --slider-glow-2: rgba(232, 147, 95, 0.85)">
         <button type="button" class="details-summary" aria-expanded={openSections.steam} onclick={() => openSections.steam = !openSections.steam}>
@@ -403,7 +408,7 @@
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>Steam generator duty Q</span><span class="slider-value">{Q} MW</span></div>
-            <input id="r-q" type="range" min="200" max="2000" step="50" bind:value={Q} onchange={runSolve} />
+            <input id="r-q" type="range" min="200" max="2000" step="5" bind:value={Q} onchange={runSolve} />
           </div>
         </div>
         {/if}
@@ -419,13 +424,24 @@
         </button>
         {#if openSections.extraction}
         <div class="slider-body" transition:slide={{ duration: 200 }}>
+          <button
+            type="button"
+            class="bypass-btn chamfer-panel chamfer-sm"
+            aria-pressed={bypassFWH}
+            onclick={() => { bypassFWH = !bypassFWH; runSolve(); }}
+          >
+            <span>{bypassFWH ? 'Feedwater heating bypassed' : 'Bypass all feedwater heating'}</span>
+          </button>
+          <p class="selection-hint">
+            Zeroes every extraction fraction (a-g). Feedwater goes straight from the condenser to the steam generator.
+          </p>
           <div class="slider-row">
             <div class="slider-label"><span>P<sub>B</sub> (FWH5 / HP bleed)</span><span class="slider-value">{P_B} MPa</span></div>
-            <input id="r-pb" type="range" min="5" max="15" step="0.1" bind:value={P_B} style="--pct: {pct(P_B,5,15)}%" onchange={() => onPressureChange('P_B')} />
+            <input id="r-pb" type="range" min="5" max="15" step="0.1" bind:value={P_B} style="--pct: {pct(P_B,5,15)}%" onchange={() => onPressureChange('P_B')} disabled={bypassFWH} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>P<sub>C</sub> (FWH4 / IP bleed)</span><span class="slider-value">{P_C} kPa</span></div>
-            <input id="r-pc" type="range" min="400" max="1500" step="10" bind:value={P_C} style="--pct: {pct(P_C,400,1500)}%" onchange={() => onPressureChange('P_C')} />
+            <input id="r-pc" type="range" min="400" max="1500" step="10" bind:value={P_C} style="--pct: {pct(P_C,400,1500)}%" onchange={() => onPressureChange('P_C')} disabled={bypassFWH} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>P<sub>D</sub> (Deaerator / IP bleed)</span><span class="slider-value">{P_D} kPa</span></div>
@@ -433,19 +449,19 @@
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>P<sub>E</sub> (FWH3 / LP bleed)</span><span class="slider-value">{P_E} kPa</span></div>
-            <input id="r-pe" type="range" min="200" max="800" step="10" bind:value={P_E} style="--pct: {pct(P_E,200,800)}%" onchange={() => onPressureChange('P_E')} />
+            <input id="r-pe" type="range" min="200" max="800" step="10" bind:value={P_E} style="--pct: {pct(P_E,200,800)}%" onchange={() => onPressureChange('P_E')} disabled={bypassFWH} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>P<sub>F</sub> (FWH2 / LP bleed)</span><span class="slider-value">{P_F} kPa</span></div>
-            <input id="r-pf" type="range" min="100" max="500" step="10" bind:value={P_F} style="--pct: {pct(P_F,100,500)}%" onchange={() => onPressureChange('P_F')} />
+            <input id="r-pf" type="range" min="100" max="500" step="10" bind:value={P_F} style="--pct: {pct(P_F,100,500)}%" onchange={() => onPressureChange('P_F')} disabled={bypassFWH} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>P<sub>G</sub> (FWH1 / LP bleed)</span><span class="slider-value">{P_G} kPa</span></div>
-            <input id="r-pg" type="range" min="50" max="300" step="5" bind:value={P_G} style="--pct: {pct(P_G,50,300)}%" onchange={() => onPressureChange('P_G')} />
+            <input id="r-pg" type="range" min="50" max="300" step="5" bind:value={P_G} style="--pct: {pct(P_G,50,300)}%" onchange={() => onPressureChange('P_G')} disabled={bypassFWH} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>FWH terminal temp diff (TTD)</span><span class="slider-value">{TTD} °C</span></div>
-            <input id="r-ttd" type="range" min="0" max="15" step="0.5" bind:value={TTD} onchange={onTTDChange} />
+            <input id="r-ttd" type="range" min="0" max="15" step="0.5" bind:value={TTD} onchange={onTTDChange} disabled={bypassFWH} />
           </div>
           <div class="slider-row">
             <div class="slider-label"><span>Condensate pump discharge P</span><span class="slider-value">{P_condpump} kPa</span></div>
@@ -667,11 +683,12 @@
             unit="%"
             accent="#35d6b4"
             accentDim="#14b8a6"
+            title="Net work vs. the exergy given up by the intermediate solar-salt loop cooling from 565 to 505 C, not just the exergy the steam happens to receive - see the equations page."
           />
           <Gauge
             label="LP exhaust quality"
             value={g3Frac}
-            valueText={result.x5 >= 0 ? fmt(result.x5 * 100, 1) : 'S/H'}
+            valueText={result.x5 >= 0 ? fmt(result.x5 * 100, 1) : 'Superheated'}
             unit={result.x5 >= 0 ? '%' : ''}
             accent={g3Accent}
             accentDim={g3AccentDim}
@@ -679,12 +696,13 @@
             dangerBelow={0.85}
           />
           <Gauge
-            label="Pump power fraction"
+            label="Pump power frac"
             value={g4Raw}
             valueText={fmt(g4Raw * 100, 2)}
             unit="%"
             accent="#b39ef7"
             accentDim="#6d4fb0"
+            title="Includes the circulating water pump, whose head is a generic plant-scale estimate (typical tower lift + flow-scaled friction), not a modeled site layout. See the equations page."
           />
         </div>
 
@@ -705,13 +723,13 @@
             <p class="readout-label">Condensate pump power</p>
             <p class="readout-value">{fmt(result.W_condpump / 1e6, 2)} <span class="readout-unit">MW</span></p>
           </div>
-          <div class="readout-card chamfer-panel chamfer-sm">
-            <p class="readout-label">Circulating pump power</p>
+          <div class="readout-card chamfer-panel chamfer-sm" title="Head is a generic tower-lift + flow-scaled-friction estimate, not a modeled site layout - see the equations page.">
+            <p class="readout-label">Circulating pump power*</p>
             <p class="readout-value">{fmt(result.W_cwpump / 1e6, 2)} <span class="readout-unit">MW</span></p>
           </div>
           <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Exergy to working fluid</p>
-            <p class="readout-value">{fmt(result.Ex_sg / 1e6, 1)} <span class="readout-unit">MW</span></p>
+            <p class="readout-value">{fmt(result.Ex_steam / 1e6, 1)} <span class="readout-unit">MW</span></p>
           </div>
           <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Total steam flow</p>
@@ -722,7 +740,7 @@
             <p class="readout-value">{fmt(result.mdot_cw, 0)} <span class="readout-unit">kg/s</span></p>
           </div>
           <div class="readout-outer" class:readout-alarm={condWarn}>
-            <div class="readout-card chamfer-panel chamfer-sm">
+            <div class="readout-card chamfer-panel chamfer-sm" class:readout-card-alarm={condWarn}>
               <p class="readout-label">Condenser pressure</p>
               <p class="readout-value" class:readout-value-alarm={condWarn}>{fmt(result.P6 / 1000, 2)} <span class="readout-unit">kPa</span></p>
             </div>
@@ -744,7 +762,7 @@
         <div class="state-wrap chamfer-panel">
           <p class="group-label" style="margin-bottom:5px">Cycle state table</p>
           <table class="state-table">
-            <thead><tr><th>State</th><th>T (°C)</th><th>P</th><th>h (kJ/kg)</th><th>s (kJ/kg·K)</th><th>ṁ (kg/s)</th></tr></thead>
+            <thead><tr><th>State</th><th>T (°C)</th><th>P</th><th class="sym-th">h (kJ/kg)</th><th class="sym-th">s (kJ/kg·K)</th><th>ṁ (kg/s)</th></tr></thead>
             <tbody>
               {#each result.stateTable as st}
                 <tr>
@@ -767,7 +785,7 @@
             booster pump or valve. See the state-visibility panel above to toggle these on the diagram.
           </p>
           <table class="state-table">
-            <thead><tr><th>State</th><th>T (°C)</th><th>P</th><th>h (kJ/kg)</th><th>s (kJ/kg·K)</th><th>ṁ (kg/s)</th></tr></thead>
+            <thead><tr><th>State</th><th>T (°C)</th><th>P</th><th class="sym-th">h (kJ/kg)</th><th class="sym-th">s (kJ/kg·K)</th><th>ṁ (kg/s)</th></tr></thead>
             <tbody>
               {#each result.extractionTable as st}
                 <tr>
@@ -798,9 +816,7 @@
   }
   @media (max-width: 800px) { .rankine-wrap { grid-template-columns: 1fr; } }
 
-  /* independent scroll panes, each column pins to the viewport top and scrolls
-     internally so paging through sliders never carries the diagram out of view.
-     both drop back to normal page flow below the breakpoint. */
+  /* independent scroll panes so paging through sliders never scrolls the diagram out of view */
   .controls-col, .diagram-col {
     position: sticky;
     top: 16px;
@@ -814,6 +830,11 @@
   .controls-col {
     padding-right: 14px;
     border-right: 1px solid rgba(0, 0, 0, 0.14);
+  }
+  /* leaves room for the condenser-pressure alarm's outer glow so overflow-x:hidden
+     (needed to keep the diagram itself from spilling out) doesn't clip it */
+  .diagram-col {
+    padding-right: 16px;
   }
   .controls-col::-webkit-scrollbar, .diagram-col::-webkit-scrollbar { width: 8px; }
   .controls-col::-webkit-scrollbar-track, .diagram-col::-webkit-scrollbar-track { background: transparent; }
@@ -903,8 +924,7 @@
       0 0 0 1.5px var(--slider-glow-1, rgba(141, 150, 134, 0.55)),
       0 0 6px 2px var(--slider-glow-2, rgba(141, 150, 134, 0.85));
   }
-  /* hover-only glow, gated to real pointer devices. touchscreens have no hover-exit
-     event, so a tap that closes the section would otherwise leave this stuck on. */
+  /* gated to real pointers: touchscreens have no hover-exit, so a tap would leave this stuck on */
   @media (hover: hover) and (pointer: fine) {
     .details-summary:hover::before {
       background: var(--slider-color, #8d9686);
@@ -914,8 +934,7 @@
     }
     .details-summary:hover { color: var(--paper); }
   }
-  /* chevron drawn as two stacked svg strokes, not a rotated border-corner box with
-     filter drop-shadow, that combination renders with a visible gap on some phones. */
+  /* two stacked svg strokes, not a rotated border box + drop-shadow (gaps on some phones) */
   .details-summary .chevron { flex-shrink: 0; margin-left: 8px; }
   .chevron-bg { fill: none; stroke: #6b7278; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
   .chevron-fg { fill: none; stroke: var(--slider-color, #8d9686); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -970,13 +989,22 @@
   .readout-value-alarm { color: var(--red-dim); font-weight: 700; }
   .readout-unit { font-family: var(--font-display); font-size: 11px; font-weight: 700; color: var(--ink-dim); }
 
-  /* readout-card's clip-path also clips box-shadow, so the alarm glow goes on this
-     unclipped wrapper instead so it can bleed past the panel edges */
+  /* outer glow lives on .readout-outer, an unclipped wrapper: the card itself
+     has chamfer-panel's clip-path, which would cut off its own outer
+     box-shadow at the card's edge. Sized to stay within .diagram-col's 16px
+     padding-right so overflow-x:hidden (needed to keep the diagram itself
+     from spilling out) doesn't clip it either. The inset ring on the card
+     itself gives a crisp edge that's never at risk from either. */
   .readout-outer { border-radius: 8px; }
   .readout-alarm { animation: readout-alarm-glow 1s ease-in-out infinite; }
   @keyframes readout-alarm-glow {
-    0%, 100% { box-shadow: 0 0 10px 2px rgba(255, 61, 46, 0.6), 0 0 0 0 rgba(255, 61, 46, 0.5); }
-    50%      { box-shadow: 0 0 26px 8px rgba(255, 61, 46, 1), 0 0 0 6px rgba(255, 61, 46, 0.18); }
+    0%, 100% { box-shadow: 0 0 5px 1px rgba(255, 61, 46, 0.55); }
+    50%      { box-shadow: 0 0 10px 3px rgba(255, 61, 46, 0.95); }
+  }
+  .readout-card-alarm { animation: readout-card-alarm-glow 1s ease-in-out infinite; }
+  @keyframes readout-card-alarm-glow {
+    0%, 100% { box-shadow: inset 0 0 6px 1.5px rgba(255, 61, 46, 0.5); }
+    50%      { box-shadow: inset 0 0 11px 3px rgba(255, 61, 46, 0.85); }
   }
 
   /* state table */
@@ -989,6 +1017,10 @@
     text-transform: uppercase; color: var(--ink-dim);
     text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--steel-900);
   }
+  /* h/s are specific (per-mass) properties - capitalizing them reads as the
+     extensive H/S instead, so this column head must not follow the sitewide
+     all-caps label convention */
+  .state-table th.sym-th { text-transform: none; }
   .state-table td {
     font-family: var(--font-mono);
     padding: 4px 8px 4px 0; font-variant-numeric: tabular-nums;
@@ -1093,8 +1125,8 @@
     margin: 0 0 16px; line-height: 1.3;
   }
 
-  /* one-click way back to a known-good cycle. same chamfered metal chrome as every
-     other panel, sized and colored like a button. */
+  /* one-click way back to a known-good cycle; hover/active chrome comes from
+     the shared button.chamfer-panel rules in global.css */
   .reset-btn {
     margin-bottom: 16px;
     padding: 8px 16px;
@@ -1102,19 +1134,27 @@
     font-size: 0.85rem;
     font-weight: 700;
     letter-spacing: 0.03em;
-    color: var(--ink);
-    cursor: pointer;
     border: none;
-    transition: color 0.15s ease, transform 0.15s ease, filter 0.15s ease;
   }
-  .reset-btn:hover {
-    color: var(--teal-dim);
-    filter: brightness(1.08);
+
+  /* same chrome as reset-btn, but full-width and stateful (pressed = active
+     bypass); overrides the standard current/pressed teal from global.css with
+     red, since this is flagging a deliberately off-nominal state, not just
+     "the page you're on" */
+  button.bypass-btn[aria-pressed="true"],
+  button.bypass-btn[aria-pressed="true"]:hover {
+    color: var(--red-dim);
   }
-  .reset-btn:active {
-    transform: translateY(1px);
-    filter: brightness(0.94);
-    text-shadow: 0 0 8px var(--teal);
+  .bypass-btn {
+    display: block;
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 8px 16px;
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    border: none;
   }
   .title-super {
     transition: text-decoration 0.2s, opacity 0.2s, color 0.2s;

@@ -22,8 +22,7 @@ export async function init() {
 
 export function getDome() { return _dome; }
 
-// Slider-clamp helpers so the UI can reject invalid pressure combos. All
-// pressures Pa; temperatures degC (matches thermo table convention). See NOTES.md.
+// Slider-clamp helpers so the UI can reject invalid pressure combos (Pa/degC, see NOTES.md)
 
 // Minimum P_C keeping FWH4's extraction fraction non-negative.
 export function minPC(P_D, TTD, eta_pump, Pfw = 25e6) {
@@ -156,6 +155,10 @@ function _buildDome() {
 export function solveCycle(p) {
   _qCache.clear();
   const TTD = p.TTD, sub = p.subcool, eta_p = p.eta_pump;
+  // Feedwater-heater bypass: forces every extraction fraction (a-g) to zero and
+  // routes the feedwater straight through both pumps with no FWH/deaerator/reheat
+  // heat addition, so the UI can show the efficiency hit from regeneration alone.
+  const bypassFWH = !!p.bypassFWH;
 
   // Cooling tower: cold circulating-water temp into the condenser. See NOTES.md.
   const T_wb = wetbulb(p.T0, p.RH);
@@ -177,11 +180,20 @@ export function solveCycle(p) {
   const P_B = p.P_B;
   const h_b1 = expand(h1, s1, P_B, p.eta_HP);
 
-  // Reheater
-  const P3 = P2 * (1 - p.reheat_dP_pct / 100);
-  const T3 = p.T3 + C2K;
-  const h3 = Q('H', 'P', P3, 'T', T3);
-  const s3 = Q('S', 'P', P3, 'T', T3);
+  // Reheater: normally powered by stream A (tapped before the HP turbine); with
+  // bypassFWH that stream is zeroed along with every other extraction, so the IP
+  // turbine just picks up where the HP turbine left off (no reheat occurs).
+  let P3, h3, s3, T3C;
+  if (bypassFWH) {
+    P3 = P2; h3 = h2; s3 = s2; T3C = T2 - C2K;
+  } else {
+    P3 = P2 * (1 - p.reheat_dP_pct / 100);
+    const T3 = p.T3 + C2K;
+    h3 = Q('H', 'P', P3, 'T', T3);
+    s3 = Q('S', 'P', P3, 'T', T3);
+    T3C = p.T3;
+  }
+  const T3K = T3C + C2K;
 
   // IP turbine
   const P4 = p.P4;
@@ -194,8 +206,7 @@ export function solveCycle(p) {
   const P_D = p.P_D;
   const h_d1 = expand(h3, s3, P_D, p.eta_IP);
 
-  // LP turbine extraction enthalpies (P6-independent). LP exhaust state is
-  // computed after the condenser converges, below.
+  // LP turbine extraction enthalpies (P6-independent); LP exhaust computed after condenser converges, below
   const P_E = p.P_E;
   const h_e1 = expand(h4, s4, P_E, p.eta_LP);
   const P_F = p.P_F;
@@ -211,8 +222,7 @@ export function solveCycle(p) {
   const Pfw = p.P_feedpump;
   const Pcond = p.P_condpump;
 
-  // Extraction point T-s coordinates. Stream A is tapped before the HP
-  // turbine (a1 = state 1). See NOTES.md.
+  // Extraction point T-s coordinates; stream A is tapped before the HP turbine (a1 = state 1), see NOTES.md
   const s_A_ex = s1 / 1000;
   const T_A_ex = p.T1;
   const s_B_ex = Q('S', 'P', P_B,  'H', h_b1)  / 1000;
@@ -228,15 +238,8 @@ export function solveCycle(p) {
   const s_G_ex = Q('S', 'P', P_G,  'H', h_g1)  / 1000;
   const T_G_ex = Q('T', 'P', P_G,  'H', h_g1)  - C2K;
 
-  // TTD-determined FWH outlet enthalpies. State numbers use v2 numbering (NOTES.md).
-  const h7p  = fwhH(P_FWH1, Pcond, TTD);  // FWH1 feedwater outlet (state 7')
-  const h8p  = fwhH(P_FWH2, Pcond, TTD);  // FWH2 feedwater outlet (state 8')
-  const h10  = fwhH(P_FWH3, Pcond, TTD);  // FWH3 feedwater outlet (state 10)
-  const h12p = fwhH(P_FWH4, Pfw,   TTD);  // FWH4 feedwater outlet (state 12')
-  const h13p = fwhH(P_FWH5, Pfw,   TTD);  // FWH5 feedwater outlet (state 13')
-  const h15  = fwhH(P_FWH6, Pfw,   TTD);  // FWH6 feedwater outlet = boiler inlet (state 15)
-
-  // Drain enthalpies
+  // Drain enthalpies (pure functions of shell pressure + subcooling, so these stay
+  // valid even at zero flow)
   const h_g2 = drainH(P_FWH1, sub);
   const h_f2 = drainH(P_FWH2, sub);
   const h_e2 = drainH(P_FWH3, sub);
@@ -245,102 +248,165 @@ export function solveCycle(p) {
   const h_a4 = drainH(P_FWH6, sub);
   const h_c3 = h_c2;   // Valve C isenthalpic
 
-  // Mass flow rate. m depends only on h1 and h15 (both P6-independent).
   const Qdot = p.Q * 1e6;
-  const m = Qdot / (h1 - h15);
 
-  // Pump A: FWH6 drain -> feedwater pump pressure
-  const s_a4 = Q('S', 'P', P_FWH6, 'H', h_a4);
-  const h_a5 = compress(h_a4, s_a4, Pfw, eta_p);
+  let m, beta, a, b, c, d, e, f, g;
+  let h_a2, h_a3, h_a5, h_b3, h_e3, h_f3;
+  let h7, h8, h9, h10, h11, h12, h13, h14, h15, s11;
+  let flow_fwh1, flow_fwh2, flow_fwh3, flow_cond, Q_cond;
+  let T6C, P6, h6, s6, h5;
 
-  // Pump B: FWH5 drain -> feedwater pump pressure
-  const s_b2 = Q('S', 'P', P_FWH5, 'H', h_b2);
-  const h_b3 = compress(h_b2, s_b2, Pfw, eta_p);
+  if (bypassFWH) {
+    // No extraction anywhere: a-g = 0, and the feedwater carries straight
+    // through both pumps with no FWH/deaerator heat addition. m and T6C are
+    // now coupled only through the condenser's own UA (no FWH energy balance
+    // ties them together), so solve both together via damped fixed-point
+    // iteration instead of the usual "m first, then condenser" shortcut.
+    a = b = c = d = e = f = g = beta = 0;
+    h_a2 = h1; h_a3 = h1; h_a5 = h_a4; h_b3 = h_b2; h_e3 = h_e2; h_f3 = h_f2;
 
-  // Deaerator outlet (state 11) + feedwater pump outlet (state 12)
-  const h11 = satH(P_DA);
-  const s11 = Q('S', 'P', P_DA, 'Q', 0);
-  const h12 = compress(h11, s11, Pfw, eta_p);
+    m = Qdot / (h1 - Q('H', 'P', Pfw, 'T', T_cw_in + 40 + C2K));  // rough seed
+    T6C = T_cw_in + 13;
+    for (let it = 0; it < 60; it++) {
+      const mdot_cw = p.r_cw * m;
+      const C_cw = mdot_cw * cp_cw;
+      const eps_cond = 1 - Math.exp(-p.UA / C_cw);
 
-  // Pump F: FWH2 drain -> condensate pump pressure
-  const s_f2 = Q('S', 'P', P_FWH2, 'H', h_f2);
-  const h_f3 = compress(h_f2, s_f2, Pcond, eta_p);
+      const P6it = Q('P', 'T', T6C + C2K, 'Q', 0);
+      const h6it = satH(P6it);
+      const h5it = expand(h4, s4, P6it, p.eta_LP);
+      const T6C_new = T_cw_in + (m * (h5it - h6it)) / (eps_cond * C_cw);
 
-  // Pump E: FWH3 drain -> condensate pump pressure. Not a valve (was until
-  // this was caught): the chain enforces P_D > P4 > P_E, and P_condpump is
-  // now kept >= P_D, so Pcond > P_E always - a drop from P_E to Pcond isn't
-  // possible without work input.
-  const s_e2 = Q('S', 'P', P_FWH3, 'H', h_e2);
-  const h_e3 = compress(h_e2, s_e2, Pcond, eta_p);
+      const s6it = Q('S', 'P', P6it, 'Q', 0);
+      const h7it = compress(h6it, s6it, Pcond, eta_p);
+      const s11it = Q('S', 'P', P_DA, 'H', h7it);
+      const h12it = compress(h7it, s11it, Pfw, eta_p);
+      const m_new = Qdot / (h1 - h12it);
 
-  // Extraction fractions (closed-form, v2 numbering). See NOTES.md for the
-  // reheater mass-balance derivation.
-  const beta = (h13p - h12p) / (h_b1 - h_b2 + h_b3 - h12p);
-  const R = h3 - h2;
-  const a = m * (R + h15 - h13p - beta * R) / (h1 + R - h13p - h_a4 + h_a5 - beta * R);
-  const b = (m - a) * beta;
-  const h_a2 = h1 - (m - a - b) * R / a;   // state a2: reheater hot-side outlet (~P1)
-  const h_a3 = h_a2;                        // state a3: Valve A isenthalpic -> FWH6 shell
-  const h14 = ((m - a) * h13p + a * h_a5) / m;      // state 14 (M5 outlet = FWH6 inlet)
-  const h13 = h13p - b * (h_b1 - h_b2) / (m - a);   // state 13 (M4 outlet = FWH5 inlet)
+      const converged = Math.abs(T6C_new - T6C) < 1e-5 && Math.abs(m_new - m) < 1e-6 * m;
+      T6C = 0.5 * T6C + 0.5 * T6C_new;
+      m = 0.5 * m + 0.5 * m_new;
+      if (converged) break;
+    }
 
-  // c: FWH4 (linear). States 12', 12, 11.
-  const c = (m - a - b) * (h12p - h12) / (h_c1 - h_c2);
-
-  // d: Deaerator mixer (linear). States 10, 11.
-  const flow_abc = m - a - b - c;
-  const d = ((m - a - b) * h11 - flow_abc * h10 - c * h_c3) / (h_d1 - h10);
-
-  // e: FWH3 + M2 mixer. States 9, 8', 10.
-  const flow_fwh3 = m - a - b - c - d;
-  const e = flow_fwh3 * (h10 - h8p) / (h_e1 - h8p);
-  const h9 = h10 - e * (h_e1 - h_e2) / flow_fwh3;  // state 9 (M2 outlet = FWH3 inlet)
-
-  // f: FWH2 + M1 mixer. States 8, 7', 8'. See NOTES.md for the M1 balance.
-  const flow_fwh2 = m - a - b - c - d - e;
-  const f = flow_fwh2 * (h8p - h7p) / (h_f1 - h_f2 + h_f3 - h7p);
-  const h8 = ((flow_fwh2 - f) * h7p + f * h_f3) / flow_fwh2;  // state 8 (M1 outlet)
-
-  const flow_fwh1 = m - a - b - c - d - e - f;
-
-  // Condenser: ε-NTU model, bounded fixed point on T_cond. See NOTES.md.
-  const mdot_cw = p.r_cw * m;
-  const C_cw = mdot_cw * cp_cw;
-  const NTU_cond = p.UA / C_cw;
-  const eps_cond = 1 - Math.exp(-NTU_cond);
-
-  let T6C = T_cw_in + 13;   // initial guess for condenser saturation temperature (°C)
-  let P6, h6, s6, h5, h7, g, flow_cond, Q_cond;
-  const COND_MAXIT = 40, COND_TOL = 1e-5;
-  for (let it = 0; it < COND_MAXIT; it++) {
+    // Recompute every state at the converged (m, T6C) for self-consistency.
     P6 = Q('P', 'T', T6C + C2K, 'Q', 0);
     h6 = satH(P6);
     s6 = Q('S', 'P', P6, 'Q', 0);
-    h5 = expand(h4, s4, P6, p.eta_LP);            // LP exhaust at condenser pressure
-    h7 = compress(h6, s6, Pcond, eta_p);          // condensate pump outlet (state 7)
-    g  = flow_fwh1 * (h7p - h7) / (h_g1 - h_g2);  // FWH1 extraction fraction
+    h5 = expand(h4, s4, P6, p.eta_LP);
+    h7 = compress(h6, s6, Pcond, eta_p);
+    h8 = h7; h9 = h7; h10 = h7;
+    h11 = h10;                                     // deaerator bypassed (isenthalpic staging step)
+    s11 = Q('S', 'P', P_DA, 'H', h11);
+    h12 = compress(h11, s11, Pfw, eta_p);
+    h13 = h12; h14 = h12; h15 = h12;
+    Q_cond = m * (h5 - h6);
+    flow_cond = flow_fwh1 = flow_fwh2 = flow_fwh3 = m;
+  } else {
+    // TTD-determined FWH outlet enthalpies. State numbers use v2 numbering (NOTES.md).
+    const h7p  = fwhH(P_FWH1, Pcond, TTD);  // FWH1 feedwater outlet (state 7')
+    const h8p  = fwhH(P_FWH2, Pcond, TTD);  // FWH2 feedwater outlet (state 8')
+    h10        = fwhH(P_FWH3, Pcond, TTD);  // FWH3 feedwater outlet (state 10)
+    const h12p = fwhH(P_FWH4, Pfw,   TTD);  // FWH4 feedwater outlet (state 12')
+    const h13p = fwhH(P_FWH5, Pfw,   TTD);  // FWH5 feedwater outlet (state 13')
+    h15        = fwhH(P_FWH6, Pfw,   TTD);  // FWH6 feedwater outlet = boiler inlet (state 15)
+
+    // Mass flow rate. m depends only on h1 and h15 (both P6-independent).
+    m = Qdot / (h1 - h15);
+
+    // Pump A: FWH6 drain -> feedwater pump pressure
+    const s_a4 = Q('S', 'P', P_FWH6, 'H', h_a4);
+    h_a5 = compress(h_a4, s_a4, Pfw, eta_p);
+
+    // Pump B: FWH5 drain -> feedwater pump pressure
+    const s_b2 = Q('S', 'P', P_FWH5, 'H', h_b2);
+    h_b3 = compress(h_b2, s_b2, Pfw, eta_p);
+
+    // Deaerator outlet (state 11) + feedwater pump outlet (state 12)
+    h11 = satH(P_DA);
+    s11 = Q('S', 'P', P_DA, 'Q', 0);
+    h12 = compress(h11, s11, Pfw, eta_p);
+
+    // Pump F: FWH2 drain -> condensate pump pressure
+    const s_f2 = Q('S', 'P', P_FWH2, 'H', h_f2);
+    h_f3 = compress(h_f2, s_f2, Pcond, eta_p);
+
+    // Pump E: FWH3 drain -> condensate pump pressure; a pump not a valve since chain ordering guarantees Pcond > P_E
+    const s_e2 = Q('S', 'P', P_FWH3, 'H', h_e2);
+    h_e3 = compress(h_e2, s_e2, Pcond, eta_p);
+
+    // Extraction fractions (closed-form, v2 numbering); see NOTES.md for the reheater mass-balance derivation
+    beta = (h13p - h12p) / (h_b1 - h_b2 + h_b3 - h12p);
+    const R = h3 - h2;
+    a = m * (R + h15 - h13p - beta * R) / (h1 + R - h13p - h_a4 + h_a5 - beta * R);
+    b = (m - a) * beta;
+    h_a2 = h1 - (m - a - b) * R / a;   // state a2: reheater hot-side outlet (~P1)
+    h_a3 = h_a2;                        // state a3: Valve A isenthalpic -> FWH6 shell
+    h14 = ((m - a) * h13p + a * h_a5) / m;      // state 14 (M5 outlet = FWH6 inlet)
+    h13 = h13p - b * (h_b1 - h_b2) / (m - a);   // state 13 (M4 outlet = FWH5 inlet)
+
+    // c: FWH4 (linear). States 12', 12, 11.
+    c = (m - a - b) * (h12p - h12) / (h_c1 - h_c2);
+
+    // d: Deaerator mixer (linear). States 10, 11.
+    const flow_abc = m - a - b - c;
+    d = ((m - a - b) * h11 - flow_abc * h10 - c * h_c3) / (h_d1 - h10);
+
+    // e: FWH3 + M2 mixer. States 9, 8', 10.
+    flow_fwh3 = m - a - b - c - d;
+    e = flow_fwh3 * (h10 - h8p) / (h_e1 - h8p);
+    h9 = h10 - e * (h_e1 - h_e2) / flow_fwh3;  // state 9 (M2 outlet = FWH3 inlet)
+
+    // f: FWH2 + M1 mixer. States 8, 7', 8'. See NOTES.md for the M1 balance.
+    flow_fwh2 = m - a - b - c - d - e;
+    f = flow_fwh2 * (h8p - h7p) / (h_f1 - h_f2 + h_f3 - h7p);
+    h8 = ((flow_fwh2 - f) * h7p + f * h_f3) / flow_fwh2;  // state 8 (M1 outlet)
+
+    flow_fwh1 = m - a - b - c - d - e - f;
+
+    // Condenser: ε-NTU model, bounded fixed point on T_cond. See NOTES.md.
+    const mdot_cw = p.r_cw * m;
+    const C_cw = mdot_cw * cp_cw;
+    const NTU_cond = p.UA / C_cw;
+    const eps_cond = 1 - Math.exp(-NTU_cond);
+
+    T6C = T_cw_in + 13;   // initial guess for condenser saturation temperature (°C)
+    const COND_MAXIT = 40, COND_TOL = 1e-5;
+    for (let it = 0; it < COND_MAXIT; it++) {
+      P6 = Q('P', 'T', T6C + C2K, 'Q', 0);
+      h6 = satH(P6);
+      s6 = Q('S', 'P', P6, 'Q', 0);
+      h5 = expand(h4, s4, P6, p.eta_LP);            // LP exhaust at condenser pressure
+      h7 = compress(h6, s6, Pcond, eta_p);          // condensate pump outlet (state 7)
+      g  = flow_fwh1 * (h7p - h7) / (h_g1 - h_g2);  // FWH1 extraction fraction
+      flow_cond = flow_fwh1 - g;
+      Q_cond = flow_cond * h5 + g * h_g2 - flow_fwh1 * h6;
+      const T6C_new = T_cw_in + Q_cond / (eps_cond * C_cw);
+      if (Math.abs(T6C_new - T6C) < COND_TOL && it > 0) { T6C = T6C_new; break; }
+      T6C = T6C_new;
+    }
+    // Recompute at the converged T6C for a self-consistent condenser pressure.
+    P6 = Q('P', 'T', T6C + C2K, 'Q', 0);
+    h6 = satH(P6);
+    s6 = Q('S', 'P', P6, 'Q', 0);
+    h5 = expand(h4, s4, P6, p.eta_LP);
+    h7 = compress(h6, s6, Pcond, eta_p);
+    g  = flow_fwh1 * (h7p - h7) / (h_g1 - h_g2);
     flow_cond = flow_fwh1 - g;
     Q_cond = flow_cond * h5 + g * h_g2 - flow_fwh1 * h6;
-    const T6C_new = T_cw_in + Q_cond / (eps_cond * C_cw);
-    if (Math.abs(T6C_new - T6C) < COND_TOL && it > 0) { T6C = T6C_new; break; }
-    T6C = T6C_new;
   }
-  // Recompute at the converged T6C for a self-consistent condenser pressure.
-  P6 = Q('P', 'T', T6C + C2K, 'Q', 0);
+
   const P5 = P6;
-  h6 = satH(P6);
-  s6 = Q('S', 'P', P6, 'Q', 0);
-  h5 = expand(h4, s4, P5, p.eta_LP);
-  h7 = compress(h6, s6, Pcond, eta_p);
-  g  = flow_fwh1 * (h7p - h7) / (h_g1 - h_g2);
-  flow_cond = flow_fwh1 - g;
-  Q_cond = flow_cond * h5 + g * h_g2 - flow_fwh1 * h6;
   const s5 = Q('S', 'P', P5, 'H', h5);
   const x5 = Q('Q', 'P', P5, 'H', h5);         // LP exhaust steam quality (-1 if superheated)
   // T5 needs its own lookup when superheated. See NOTES.md.
   const T5 = x5 >= 0 ? T6C : Q('T', 'P', P5, 'H', h5) - C2K;
 
   // Emergent circulating-water metrics (readouts, not inputs).
+  const mdot_cw = p.r_cw * m;
+  const C_cw = mdot_cw * cp_cw;
+  const NTU_cond = p.UA / C_cw;
+  const eps_cond = 1 - Math.exp(-NTU_cond);
   const cond_range   = Q_cond / C_cw;          // CW temperature rise across the condenser
   const T_cw_out     = T_cw_in + cond_range;
   const cond_TTD_eff = T6C - T_cw_out;         // condenser terminal temperature difference
@@ -359,11 +425,27 @@ export function solveCycle(p) {
   const W_pE = e * (h_e3 - h_e2);
   const W_fwp = (m - a - b) * (h12 - h11);        // feedwater pump: states 11->12
 
-  // Circulating water pump: basin -> condenser inlet. Not otherwise modeled
-  // upstream, so assume a 2 bar head (typical piping friction + cooling
-  // tower riser/nozzle pressure) at the same reference pressure used for
-  // the cp_cw lookup above.
-  const P_cw_lo = 1.5 * BAR, dP_cw = 2 * BAR;
+  // Circulating water pump, basin -> condenser inlet -> back up to the tower
+  // distribution deck. This cycle is modeled with a natural-draft hyperbolic
+  // tower (buoyancy-driven, no fan) rather than a mechanical-draft one, but
+  // that mainly changes the empty chimney shell above the fill - the pump only
+  // has to lift water to the top of the fill/distribution deck, which for a
+  // large natural-draft tower is still a modest height, not the tower's full
+  // structural height. No piping/tower layout is modeled, so head is split
+  // into two representative terms instead of one flat guess: a static lift to
+  // that distribution deck (plant geometry doesn't depend on flow), plus a
+  // friction term anchored to a reference CW flow and scaled by velocity^2
+  // (~mdot_cw^2) like any real piping/tube-side loss, so it actually responds
+  // to r_cw and the solved cycle instead of sitting fixed. Both anchor figures
+  // are generic plant-scale ballparks, not a specific site's design - see
+  // NOTES.md.
+  const P_cw_lo = 1.5 * BAR;
+  const rho_cw = Q('DMASS', 'P', P_cw_lo, 'T', T_cw_in + C2K);
+  const H_LIFT = 15;                  // m, typical fill/distribution-deck height above the basin for a large natural-draft tower
+  const dP_lift = rho_cw * 9.81 * H_LIFT;
+  const MDOT_CW_REF = 12300;          // kg/s, representative CW flow for a large fossil-fuel unit's condenser (a fixed anchor, deliberately not tied to whatever the Q/r_cw sliders currently default to)
+  const dP_FRICTION_REF = 0.9 * BAR;  // piping + condenser tube-side friction at that reference flow
+  const dP_cw = dP_lift + dP_FRICTION_REF * (mdot_cw / MDOT_CW_REF) ** 2;
   const h_cwin = Q('H', 'P', P_cw_lo, 'T', T_cw_in + C2K);
   const s_cwin = Q('S', 'P', P_cw_lo, 'T', T_cw_in + C2K);
   const h_cwout = compress(h_cwin, s_cwin, P_cw_lo + dP_cw, eta_p);
@@ -375,16 +457,47 @@ export function solveCycle(p) {
   const eta_1 = W_net / Qdot;
 
   // 2nd law (exergetic) efficiency. See NOTES.md.
+  //
+  // Ex_steam is the exergy the WORKING FLUID gains crossing the boiler - a
+  // legitimate textbook quantity, but scoped only to the steam side. It has no
+  // way to see how irreversibly that heat was actually transferred in, so a
+  // slider change that forces the boiler to heat much colder feedwater (e.g.
+  // bypassing every FWH) can make eta_2 look *better* even though the plant is
+  // strictly worse: cutting the FWHs' own mixing/throttling losses can outweigh
+  // the (invisible, to Ex_steam) extra irreversibility of the wider-ΔT boiler
+  // heat exchange, unless there's an actual external reference to check against.
+  //
+  // Ex_source fixes that by pricing the SAME heat Qdot against the
+  // intermediate loop's own temperature glide instead of the steam's. This is
+  // the solar-salt loop from the plant diagram (60% NaNO3/40% KNO3, MANTA
+  // Collaboration 2024) - distinct from the FLiBe primary loop, which cools
+  // the blanket but never reaches the power cycle. It enters the steam
+  // generator at 565 C and leaves at 505 C (Colliva et al. 2024, Table 1 -
+  // same supply/return regardless of which paper's intermediate fluid is
+  // used, since the exergy calc below only needs the two temperatures and
+  // the duty, not the fluid's mass flow or cp). For a sensible-heat stream of
+  // ~constant cp, the exergy it gives up cooling from T_in to T_out at duty
+  // Qdot is Qdot*(1 - T0/T_lm), where T_lm is the log-mean (entropic-average)
+  // temperature of that stream. Ex_source is therefore independent of every
+  // steam-side slider, so eta_2 = W_net/Ex_source now moves the same
+  // direction as eta_1 for changes that make the boiler's job harder,
+  // closing the loophole above.
   const T0K = p.T0 + C2K;
+  const T_SOURCE_IN = 565 + C2K;   // intermediate (solar-salt) loop supply to the steam generator
+  const T_SOURCE_OUT = 505 + C2K;  // intermediate loop return
+  const T_lm_source = (T_SOURCE_IN - T_SOURCE_OUT) / Math.log(T_SOURCE_IN / T_SOURCE_OUT);
+  const Ex_source = Qdot * (1 - T0K / T_lm_source);
+
   const s15_si = Q('S', 'P', Pfw, 'H', h15); // J/kg/K
-  const Ex_sg = m * ((h1 - h15) - T0K * (s1 - s15_si));
-  const eta_2 = W_net / Ex_sg;
-  const Irr = Ex_sg - W_net; // total exergy destroyed, consistent with eta_2
+  const Ex_steam = m * ((h1 - h15) - T0K * (s1 - s15_si));
+  const eta_2 = W_net / Ex_source;
+  const Irr_sg = Ex_source - Ex_steam;  // exergy destroyed transferring heat into the steam itself
+  const Irr_cycle = Ex_steam - W_net;   // exergy destroyed downstream of the boiler (turbines, condenser, pumps, FWH mixing)
+  const Irr = Ex_source - W_net;        // total exergy destroyed, consistent with eta_2 (Irr_sg + Irr_cycle)
 
   // T-s diagram paths
 
-  // Steam-generator path: state 15 (boiler inlet) to state 1 (boiler outlet).
-  // Handles both supercritical (smooth) and subcritical (plateau) cases.
+  // Steam-generator path, state 15 to state 1; handles both supercritical and subcritical cases
   const T15K = Q('T', 'P', Pfw, 'H', h15);
   const Pcrit = PCRIT_PA;
   const steamGenPath = [];
@@ -424,7 +537,7 @@ export function solveCycle(p) {
   // Reheater path at P3
   const reheatPath = [];
   for (let i = 0; i <= 8; i++) {
-    const Tp = T2 + (T3 - T2) * i / 8;
+    const Tp = T2 + (T3K - T2) * i / 8;
     reheatPath.push([Q('S', 'P', P3, 'T', Tp) / 1000, Tp - C2K]);
   }
 
@@ -445,8 +558,7 @@ export function solveCycle(p) {
     ...turbSeg(s_G_ex*1000, P_G, s5,          P5,  8).slice(1),
   ];
 
-  // Feedwater train T-s coordinates, v2 numbering. State 6 = combined
-  // condenser+hotwell outlet; state 7 = condensate pump outlet.
+  // Feedwater train T-s coordinates, v2 numbering (state 6 = condenser+hotwell outlet, state 7 = condensate pump outlet)
   const s6v   = s6 / 1000;                              // state 6
   const T6v   = T6C;
   const T7v   = Q('T', 'P', Pcond, 'H', h7)  - C2K;   // state 7
@@ -458,7 +570,7 @@ export function solveCycle(p) {
   const T10v  = Q('T', 'P', Pcond, 'H', h10) - C2K;   // state 10
   const s10v  = Q('S', 'P', Pcond, 'H', h10) / 1000;
   const s11v  = s11 / 1000;                             // state 11 (deaerator outlet)
-  const T11v  = satT(P_DA) - C2K;
+  const T11v  = Q('T', 'P', P_DA, 'H', h11) - C2K;    // sat. liquid normally; subcooled if bypassed
   const T12v  = Q('T', 'P', Pfw,   'H', h12) - C2K;   // state 12
   const s12v  = Q('S', 'P', Pfw,   'H', h12) / 1000;
   const T13v  = Q('T', 'P', Pfw,   'H', h13) - C2K;   // state 13
@@ -471,8 +583,7 @@ export function solveCycle(p) {
   // Condenser: isobar from LP exhaust to sat liquid at P6
   const condenserPath = iso(P6, h5, h6, 8);
 
-  // Feedwater train: isobars for heating legs, seg() for pump compressions.
-  // State 10->11 bridges as a single point (mixing jump, not an isobar).
+  // Feedwater train isobars; state 10->11 bridges as a single point (mixing jump, not an isobar)
   const fwPath = [
     ...seg(h6,  P6,   h7,  Pcond, 4),          // condensate pump 6->7
     ...iso(Pcond, h7,  h8,  8).slice(1),         // LP FWH tube heating 7->8
@@ -495,7 +606,8 @@ export function solveCycle(p) {
     { P: P_F,  hEx: h_f1,  sEx: s_F_ex, TEx: T_F_ex, name: 'FWH2 shell' },
     { P: P_G,  hEx: h_g1,  sEx: s_G_ex, TEx: T_G_ex, name: 'FWH1 shell' },
   ];
-  const fwhShellPaths = shellData.map(({ P, hEx, sEx, TEx, name }) => {
+  // No steam actually flows to any shell when bypassed, so there's nothing to draw.
+  const fwhShellPaths = bypassFWH ? [] : shellData.map(({ P, hEx, sEx, TEx, name }) => {
     const Tsat = satT(P) - C2K;
     const sf   = Q('S', 'P', P, 'Q', 0) / 1000;
     const sg   = Q('S', 'P', P, 'Q', 1) / 1000;
@@ -512,8 +624,8 @@ export function solveCycle(p) {
   // All 15 main cycle state points - always shown on the T-s diagram.
   const statePoints = {
     1:  [s1/1000,  p.T1,    `State 1: Boiler outlet / HP turbine inlet, ${p.T1}°C, ${(p.P1/1e6).toFixed(1)} MPa`],
-    2:  [s2/1000,  T2-C2K,  'State 2: HP turbine exhaust / reheater inlet'],
-    3:  [s3/1000,  p.T3,    `State 3: Reheater outlet / IP turbine inlet, ${p.T3}°C`],
+    2:  [s2/1000,  T2-C2K,  bypassFWH ? 'State 2: HP turbine exhaust / IP turbine inlet (no reheat)' : 'State 2: HP turbine exhaust / reheater inlet'],
+    3:  [s3/1000,  T3C,     bypassFWH ? `State 3: = state 2, reheat bypassed` : `State 3: Reheater outlet / IP turbine inlet, ${T3C}°C`],
     4:  [s4/1000,  T4-C2K,  'State 4: IP turbine exhaust / LP turbine inlet'],
     5:  [s5/1000,  T5,      'State 5: LP turbine exhaust / condenser inlet'],
     6:  [s6v,      T6v,     `State 6: Condenser+hotwell outlet (sat. liquid), ${T6C.toFixed(1)}°C`],
@@ -521,15 +633,14 @@ export function solveCycle(p) {
     8:  [s8v,      T8v,     'State 8: M1 outlet / FWH2 tube inlet'],
     9:  [s9v,      T9v,     'State 9: M2 outlet / FWH3 tube inlet'],
     10: [s10v,     T10v,    'State 10: FWH3 tube outlet'],
-    11: [s11v,     T11v,    `State 11: Deaerator outlet (sat. liquid), ${T11v.toFixed(1)}°C`],
+    11: [s11v,     T11v,    bypassFWH ? `State 11: Deaerator bypassed (subcooled), ${T11v.toFixed(1)}°C` : `State 11: Deaerator outlet (sat. liquid), ${T11v.toFixed(1)}°C`],
     12: [s12v,     T12v,    'State 12: Feedwater pump outlet'],
     13: [s13v,     T13v,    'State 13: M4 outlet / FWH5 tube inlet'],
     14: [s14v,     T14v,    'State 14: M5 outlet / FWH6 tube inlet'],
     15: [s15v,     T15v,    `State 15: Boiler inlet, ${T15v.toFixed(1)}°C`],
   };
 
-  // Extraction and drain state points, shown via the checkbox panel. See
-  // NOTES.md for the X1/X2/X3 and A-stream naming scheme.
+  // Extraction/drain state points, shown via the checkbox panel; see NOTES.md for the naming scheme
   const s_A2 = Q('S','P',P1,   'H',h_a2)/1000; const T_A2 = Q('T','P',P1,   'H',h_a2)-C2K;
   const s_A3 = Q('S','P',P_VA, 'H',h_a3)/1000; const T_A3 = Q('T','P',P_VA, 'H',h_a3)-C2K;
   const s_A4 = Q('S','P',P_VA, 'H',h_a4)/1000; const T_A4 = Q('T','P',P_VA, 'H',h_a4)-C2K;
@@ -542,8 +653,7 @@ export function solveCycle(p) {
   const s_F3 = Q('S','P',Pcond,'H',h_f3)/1000; const T_F3 = Q('T','P',Pcond,'H',h_f3)-C2K;
   const s_G2 = Q('S','P',P_G,  'H',h_g2)/1000; const T_G2 = Q('T','P',P_G,  'H',h_g2)-C2K;
 
-  // Valve outlet states (X3 for streams C, G): isenthalpic throttle to destination pressure.
-  // E3 is a pump outlet (h_e3, computed above), not a throttle - see note by W_pE.
+  // Valve outlet states (X3 for C, G); E3 is a pump outlet, not a throttle, see note by W_pE
   const s_C3 = Q('S','P',P_DA,  'H',h_c2)/1000; const T_C3 = Q('T','P',P_DA,  'H',h_c2)-C2K;
   const s_E3 = Q('S','P',Pcond, 'H',h_e3)/1000; const T_E3 = Q('T','P',Pcond, 'H',h_e3)-C2K;
   const s_G3 = Q('S','P',P6,    'H',h_g2)/1000; const T_G3 = Q('T','P',P6,    'H',h_g2)-C2K;
@@ -551,7 +661,9 @@ export function solveCycle(p) {
   const MPa = (pa) => `${(pa/1e6).toFixed(1)} MPa`;
   const kPa = (pa) => `${(pa/1e3).toFixed(0)} kPa`;
 
-  const extractionStatePoints = {
+  // No steam actually flows to any extraction/drain point when bypassed, so
+  // there's nothing real to plot - matches fwhShellPaths/drainPaths above.
+  const extractionStatePoints = bypassFWH ? {} : {
     A1: [s_A_ex, T_A_ex, `A1: Extraction to reheater (= state 1), ${MPa(p.P1)}`],
     A2: [s_A2,   T_A2,   `A2: Reheater outlet / Valve A inlet, ${MPa(p.P1)}`],
     A3: [s_A3,   T_A3,   `A3: Valve A outlet / FWH6 shell inlet, ${MPa(p.P_VA)}`],
@@ -575,8 +687,9 @@ export function solveCycle(p) {
     G3: [s_G3,   T_G3,   `G3: FWH1 drain after valve G, condenser P`],
   };
 
-  // Drain process paths: pump compressions (seg) and isenthalpic valve drops (two points)
-  const drainPaths = [
+  // Drain process paths: pump compressions (seg) and isenthalpic valve drops (two points).
+  // No steam actually flows to any drain when bypassed, so there's nothing to draw.
+  const drainPaths = bypassFWH ? [] : [
     iso(P1, h1, h_a2, 6),                    // reheater hot side: A1 -> A2 (cooling at ~P1)
     [[s_A2, T_A2], [s_A3, T_A3]],            // valve A: A2 -> A3 (isenthalpic to shell P)
     seg(h_a4, P_VA, h_a5, Pfw,   4),        // pump A: A4 -> A5
@@ -587,14 +700,11 @@ export function solveCycle(p) {
     [[s_G2, T_G2], [s_G3, T_G3]],            // valve G: G2 -> G3 (condenser flash)
   ];
 
-  // Full 15-state table (T/P/h/s + mass flow at each point). Flow bookkeeping
-  // follows the extraction order down the turbine train (a,b off before/in
-  // the HP turbine; c,d in the IP turbine; e,f,g in the LP turbine) and back
-  // up the feedwater train as each drain rejoins at its mixer (M1-M5).
+  // Full 15-state table; flow bookkeeping follows extraction order down the turbine train and back up as drains rejoin at M1-M5
   const stateTable = [
     ['1',  p.T1,  P1,    h1,  s1/1000,   m],
     ['2',  T2-C2K, P2,   h2,  s2/1000,   m - a - b],
-    ['3',  p.T3,  P3,    h3,  s3/1000,   m - a - b],
+    ['3',  T3C,   P3,    h3,  s3/1000,   m - a - b],
     ['4',  T4-C2K, P4,   h4,  s4/1000,   m - a - b - c - d],
     ['5',  T5,    P5,    h5,  s5/1000,   flow_cond],
     ['6',  T6C,   P6,    h6,  s6v,       flow_fwh1],
@@ -611,9 +721,7 @@ export function solveCycle(p) {
     name, T, P: P / 1e6, h: h / 1000, s, flow,
   }));
 
-  // Extraction/drain state table (X1/X2/X3 scheme, see NOTES.md): every
-  // bleed's own flow is constant along its branch, so mass flow is just the
-  // stream's own extraction fraction (a-g) throughout.
+  // Extraction/drain state table; each bleed's flow is constant along its branch (a-g), see NOTES.md
   const extractionTable = [
     ['A1', 'A', T_A_ex, P1,   h1,   s_A_ex, a],
     ['A2', 'A', T_A2,   P1,   h_a2, s_A2,   a],
@@ -644,7 +752,8 @@ export function solveCycle(p) {
     m, a, b, c, d, e, f, g,
     h1, h2, h3, h4, h5, h6, h7,
     h8, h9, h10, h11, h12, h13, h14, h15,
-    W_net, W_turb, W_pumps, W_fwp, W_cwpump, W_condpump, W_pE, eta_1, eta_2, x5, Ex_sg, Irr,
+    W_net, W_turb, W_pumps, W_fwp, W_cwpump, W_condpump, W_pE, eta_1, eta_2, x5,
+    Ex_source, Ex_steam, Irr, Irr_sg, Irr_cycle,
     T6C, T_wb, P6, flow_cond,
     // Level-3 circulating-water / condenser readouts (all emergent):
     mdot_cw, cp_cw, NTU_cond, eps_cond, cond_range, cond_TTD_eff, T_cw_in, T_cw_out, Q_cond,

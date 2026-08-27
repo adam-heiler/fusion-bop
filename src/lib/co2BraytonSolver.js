@@ -113,18 +113,7 @@ function _buildDome() {
   return { liq, vap, dome };
 }
 
-// Recompression sCO2 Brayton cycle with reheat. State numbering follows the
-// site's co2-brayton.csv (NOT the study's): 1 SHX->HP turbine, 2 HP->SHX,
-// 3 SHX->LP turbine, 4 LP->HTR hot, 5 HTR->LTR hot, 6 LTR hot out / split,
-// M1=6 main branch, M2 precooler out / main comp in, M3 main comp out / LTR
-// cold in, M4 LTR cold out, A1=6 aux branch, A2 aux comp out, 7 mix out /
-// HTR cold in, 8 HTR cold out / SHX in.
-//
-// Both regenerators use enthalpy-based effectiveness (standard for sCO2 -
-// cp varies too strongly near the critical point for a cp-based ε-NTU form):
-// Q = ε · min(hot-side ideal duty, cold-side ideal duty), each ideal duty
-// being the enthalpy change if that stream reached the other stream's inlet
-// temperature at its own pressure.
+// Recompression sCO2 Brayton cycle with reheat; state numbering follows co2-brayton.csv (NOT the study's). Regenerators use enthalpy-based effectiveness (standard for sCO2, since cp varies too strongly near the critical point for a cp-based ε-NTU form): Q = ε · min(hot-side ideal duty, cold-side ideal duty).
 export function solveCycle(p) {
   _qCache.clear();
   const warnings = [];
@@ -161,9 +150,7 @@ export function solveCycle(p) {
   const T4K = Q('T', 'P', P_lo, 'H', h4);
   const s4 = Q('S', 'P', P_lo, 'H', h4);
 
-  // HTR/LTR are coupled through the mix point (7): LTR needs state 5 (HTR
-  // hot outlet); HTR needs state 7 (LTR cold outlet mixed with aux
-  // discharge). Scalar fixed point on h5, per-unit-total-flow basis.
+  // HTR/LTR coupled through mix point 7 (LTR needs HTR's state 5, HTR needs LTR's state 7); scalar fixed point on h5, per-unit-total-flow basis.
   let h5 = h4 - p.eps_HTR * (h4 - Q('H', 'P', P_lo, 'T', T_M3K));
   let h6 = 0, h_M4 = 0, h_A2 = 0, h7 = 0, Q_LTR = 0, Q_HTR = 0;
   const MAXIT = 60, TOL = 0.5; // J/kg
@@ -225,16 +212,12 @@ export function solveCycle(p) {
   const W_C2 = aF * (h_A2 - h6);
   const W_comp = W_C1 + W_C2;
 
-  // Precooler heat rejection -> circulating water flow (from a chosen CW
-  // temperature rise) -> circulating pump work (2 bar head, same assumption
-  // as the Rankine model's cooling loop).
+  // Precooler heat rejection -> CW flow (from chosen CW temp rise) -> circulating pump work (2 bar head, same assumption as Rankine model's cooling loop).
   const Q_pc = m * (h6 - h_M2);
   const cp_cw = QW('CPMASS', 'P', 1.5 * BAR, 'T', (T_cw_in + p.cw_range / 2) + C2K);
   const mdot_cw = Q_pc / (cp_cw * p.cw_range);
   const T_cw_out = T_cw_in + p.cw_range;
-  // Incompressible ṁ·ΔP/(ρ·η) form rather than an H(P,S) lookup - the
-  // isentropic-enthalpy route fails (returns Inf) for water near 0°C, which a
-  // cold-ambient slider combination can reach.
+  // Incompressible ṁ·ΔP/(ρ·η) form rather than H(P,S), which fails (Inf) for water near 0°C, reachable with cold-ambient slider settings.
   const P_cw_lo = 1.5 * BAR, dP_cw = 2 * BAR;
   const rho_cw = QW('D', 'P', P_cw_lo, 'T', T_cw_in + C2K);
   const W_cwpump = mdot_cw * dP_cw / (rho_cw * p.eta_comp);
@@ -242,10 +225,29 @@ export function solveCycle(p) {
   const W_net = (W_turb - W_comp) * p.eta_gen - W_cwpump;
   const eta_1 = W_net / Qdot;
 
-  // 2nd law (exergetic) efficiency: flow-exergy increase across both SHX passes.
+  // 2nd law (exergetic) efficiency. Ex_gas is the flow-exergy the CO2 itself
+  // gains across both SHX passes - a legitimate quantity, but scoped only to
+  // the gas side, so it can't see how irreversibly that heat was actually
+  // transferred in. Ex_source instead prices the same duty against the
+  // intermediate loop's own temperature glide (the solar-salt loop from the
+  // plant diagram, same 565/505 C supply/return as the Rankine cycle - the
+  // salt splits into two parallel passes here (main + reheat), but both still
+  // run the full 565->505 C, so pricing the combined duty against one T_lm is
+  // exact, not an approximation - see NOTES.md). See rankineSolver.js for the
+  // full derivation - Ex_source = Qdot*(1 - T0/T_lm), independent of every
+  // gas-side slider, so eta_2 can't be gamed by changing how the CO2 arrives
+  // at the SHX the way a gas-side-only reference could be.
   const T0K = p.T0 + C2K;
-  const Ex_in = mtot * ((h1 - h8) - T0K * (s1 - s8) + (h3 - h2) - T0K * (s3 - s2));
-  const eta_2 = W_net / Ex_in;
+  const T_SOURCE_IN = 565 + C2K;
+  const T_SOURCE_OUT = 505 + C2K;
+  const T_lm_source = (T_SOURCE_IN - T_SOURCE_OUT) / Math.log(T_SOURCE_IN / T_SOURCE_OUT);
+  const Ex_source = Qdot * (1 - T0K / T_lm_source);
+
+  const Ex_gas = mtot * ((h1 - h8) - T0K * (s1 - s8) + (h3 - h2) - T0K * (s3 - s2));
+  const eta_2 = W_net / Ex_source;
+  const Irr_shx = Ex_source - Ex_gas;  // exergy destroyed transferring heat into the CO2 itself
+  const Irr_cycle = Ex_gas - W_net;    // exergy destroyed downstream (turbines, compressors, regenerators, precooler)
+  const Irr = Ex_source - W_net;       // total exergy destroyed, consistent with eta_2 (Irr_shx + Irr_cycle)
 
   const bwr = W_comp / W_turb;                       // back-work ratio
   const regen_share = (Q_HTR + Q_LTR) / (Q_HTR + Q_LTR + q_in);
@@ -322,7 +324,8 @@ export function solveCycle(p) {
     mtot, m, aF,
     W_net, W_turb, W_HP, W_LP, W_comp, W_C1, W_C2, W_cwpump,
     eta_1, eta_2, bwr, regen_share,
-    Q_pc, Q_HTR: mtot * Q_HTR, Q_LTR: mtot * Q_LTR, Ex_in,
+    Q_pc, Q_HTR: mtot * Q_HTR, Q_LTR: mtot * Q_LTR,
+    Ex_source, Ex_gas, Irr, Irr_shx, Irr_cycle,
     q1: mtot * q1, qrh: mtot * qrh,
     T_wb, T_cw_in, T_cw_out, mdot_cw, T_M2, rho_M2,
     statePoints, branchStatePoints, stateTable,

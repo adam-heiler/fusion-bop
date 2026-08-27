@@ -4,9 +4,7 @@
   import { initHESolver, solveHEAsync } from '../lib/heWorkerClient.js';
   import Gauge from './Gauge.svelte';
 
-  // slider defaults follow the ARC study (sustainability-16-07480, tables 13/14).
-  // see heBraytonSolver.js for the validated-vs-paper writeup, matches within ~1%
-  // at these defaults. pressures in MPa, temperatures degC, effectiveness/drop in %.
+  // slider defaults follow the ARC study (sustainability-16-07480, tables 13/14); see heBraytonSolver.js for the validation writeup
   const DEFAULTS = {
     P_high: 5.0, P_mid: 3.5, P_low: 2.3,
     T1: 530, Q: 645,
@@ -32,9 +30,7 @@
   let itc_approach = $state(DEFAULTS.itc_approach);
   let cw_range    = $state(DEFAULTS.cw_range);
 
-  // pressure ordering: P_high > P_mid > P_low, all MPa. no TTD-style phase
-  // boundaries here, helium never condenses in this range, so plain
-  // synchronous chain-walking is enough, no solver round trips.
+  // pressure ordering: P_high > P_mid > P_low, all MPa; helium never condenses here so plain chain-walking suffices
   const GAP = 0.2; // MPa
   const snap = (v: number) => +v.toFixed(2);
 
@@ -133,9 +129,7 @@
 
   onMount(async () => {
     await initHESolver();
-    // CoolProp's wasm module loads fast, but its first helium property lookup
-    // has its own ~2.5s cold-start cost loading helium's reference EOS data.
-    // awaiting this first solve keeps that cost inside the loading screen.
+    // first helium property lookup has a ~2.5s cold-start cost, so await it here to keep that inside the loading screen
     await runSolve();
     loading = false;
   });
@@ -149,9 +143,7 @@
   const g3AccentDim = $derived(g3Warn ? '#c0392b' : '#6d4fb0');
   const g4Val = $derived(result ? result.regen_share : 0);   // regeneration share
 
-  // t-s diagram geometry. helium's s-scale runs far higher than CO2's or water's,
-  // this cycle sits at s ~20-26 kJ/kg-K, T 20-560degC. no saturation dome to draw,
-  // helium's critical point is nowhere near this range, fluid is single-phase here.
+  // t-s diagram geometry: helium sits at s ~20-26 kJ/kg-K, T 20-560degC; no saturation dome, fluid is single-phase here
   const SVG_W = 500, SVG_H = 370;
   const PL = 46, PR = 10, PT = 12, PB = 36;
   const CW = SVG_W - PL - PR, CH = SVG_H - PT - PB;
@@ -404,6 +396,7 @@
             unit="%"
             accent="#35d6b4"
             accentDim="#14b8a6"
+            title="Net work vs. the exergy given up by the intermediate solar-salt loop cooling from 565 to 505 C, not just the exergy the helium happens to receive."
           />
           <Gauge
             label="Back-work ratio"
@@ -445,6 +438,18 @@
             <p class="readout-label">Total He flow</p>
             <p class="readout-value">{fmt(result.m, 0)} <span class="readout-unit">kg/s</span></p>
           </div>
+          <div class="readout-card chamfer-panel chamfer-sm" title="Exergy given up by the intermediate solar-salt loop cooling from a fixed 565 to 505 C - independent of every gas-side slider.">
+            <p class="readout-label">Exergy from intermediate loop*</p>
+            <p class="readout-value">{fmt(result.Ex_source / 1e6, 1)} <span class="readout-unit">MW</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm">
+            <p class="readout-label">Exergy to helium</p>
+            <p class="readout-value">{fmt(result.Ex_gas / 1e6, 1)} <span class="readout-unit">MW</span></p>
+          </div>
+          <div class="readout-card chamfer-panel chamfer-sm" title="Exergy lost transferring heat from the primary loop into the helium across a finite temperature difference - grows the wider that gap gets.">
+            <p class="readout-label">Exergy lost in SHX</p>
+            <p class="readout-value">{fmt(result.Irr_shx / 1e6, 1)} <span class="readout-unit">MW</span></p>
+          </div>
           <div class="readout-card chamfer-panel chamfer-sm">
             <p class="readout-label">Precooler duty</p>
             <p class="readout-value">{fmt(result.Q_pc / 1e6, 1)} <span class="readout-unit">MW</span></p>
@@ -478,7 +483,7 @@
         <div class="state-wrap chamfer-panel">
           <p class="group-label" style="margin-bottom:5px">Cycle state table</p>
           <table class="state-table">
-            <thead><tr><th>State</th><th>T (°C)</th><th>P (MPa)</th><th>h (kJ/kg)</th><th>s (kJ/kg·K)</th></tr></thead>
+            <thead><tr><th>State</th><th>T (°C)</th><th>P (MPa)</th><th class="sym-th">h (kJ/kg)</th><th class="sym-th">s (kJ/kg·K)</th></tr></thead>
             <tbody>
               {#each result.stateTable as st}
                 <tr>
@@ -508,8 +513,7 @@
   }
   @media (max-width: 800px) { .brayton-wrap { grid-template-columns: 1fr; } }
 
-  /* independent scroll panes, see RankineCycle.svelte / CO2BraytonCycle.svelte
-     for the full rationale */
+  /* independent scroll panes, see RankineCycle.svelte / CO2BraytonCycle.svelte for the full rationale */
   .controls-col, .diagram-col {
     position: sticky;
     top: 16px;
@@ -679,6 +683,10 @@
     text-transform: uppercase; color: var(--ink-dim);
     text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--steel-900);
   }
+  /* h/s are specific (per-mass) properties - capitalizing them reads as the
+     extensive H/S instead, so this column head must not follow the sitewide
+     all-caps label convention */
+  .state-table th.sym-th { text-transform: none; }
   .state-table td {
     font-family: var(--font-mono);
     padding: 4px 8px 4px 0; font-variant-numeric: tabular-nums;
@@ -742,6 +750,7 @@
     margin: 0 0 16px; line-height: 1.3;
   }
 
+  /* hover/active chrome comes from the shared button.chamfer-panel rules in global.css */
   .reset-btn {
     margin-bottom: 16px;
     padding: 8px 16px;
@@ -749,18 +758,6 @@
     font-size: 0.85rem;
     font-weight: 700;
     letter-spacing: 0.03em;
-    color: var(--ink);
-    cursor: pointer;
     border: none;
-    transition: color 0.15s ease, transform 0.15s ease, filter 0.15s ease;
-  }
-  .reset-btn:hover {
-    color: var(--teal-dim);
-    filter: brightness(1.08);
-  }
-  .reset-btn:active {
-    transform: translateY(1px);
-    filter: brightness(0.94);
-    text-shadow: 0 0 8px var(--teal);
   }
 </style>

@@ -29,8 +29,8 @@
   --aluminum: url('/textures/brushed-aluminum.webp'); /* never tiled, always background-size cover */
   --stainless: url('/textures/stainless-steel.webp'); /* grain-free, safe for small or stretched crops */
 
-  --font-display: 'Inter', 'Segoe UI', sans-serif;
-  --font-mono: 'Inter Tight', 'Inter', 'Segoe UI', sans-serif;
+  --font-display: 'Switzer', 'Segoe UI', sans-serif;
+  --font-mono: 'Switzer', 'Segoe UI', sans-serif;
 }
 
 html {
@@ -50,43 +50,37 @@ h1, h2, h3, h4 {
   letter-spacing: 0.01em;
 }
 
-/* standard content width, page titles line up with the simulator wrapper's left edge.
-   full-bleed elements like the nav and hero banner skip this. */
+/* standard content width; full-bleed elements like the nav and hero skip this */
 .page-container {
   max-width: 1280px;
   margin: 0 auto;
 }
 
-/* wider column for content that needs more room, process diagrams and hero banners.
-   still centered and capped, never edge to edge on huge monitors. */
+/* wider column for process diagrams and hero banners, still capped */
 .page-breakout {
   max-width: 1760px;
   margin: 0 auto;
 }
 
-/* boxes each simulator in its own chamfered panel, narrower than the page column.
-   combine with chamfer-panel chamfer-all. */
+/* boxes each simulator in its own chamfered panel; combine with chamfer-panel chamfer-all */
 .simulator-box {
   max-width: 1100px;
   margin: 0 auto 32px;
   padding: 32px 36px;
 }
 .simulator-box.chamfer-panel::before {
-  background-image: linear-gradient(165deg, var(--steel-300), var(--steel-600) 75%);
+  background-image: linear-gradient(165deg, var(--steel-300), var(--steel-500) 75%);
   background-size: 100% 100%;
   background-blend-mode: normal;
 }
 @media (max-width: 480px) {
-  /* main already has 24px padding, the full 36px side padding here left no room
-     for the two column grids inside (gauges, readout cards). */
+  /* main's 24px + the full 36px side padding left no room for the gauge/card grids */
   .simulator-box {
     padding: 20px 14px;
   }
 }
 
-/* process flow diagrams on the rankine/co2-brayton/he-brayton pages.
-   each page sets its own max-width based on the image's native resolution
-   so labels render at a consistent size everywhere. */
+/* each cycle page sets its own max-width so labels render at a consistent size */
 .cycle-diagram {
   display: block;
   width: 100%;
@@ -95,8 +89,7 @@ h1, h2, h3, h4 {
   filter: drop-shadow(0 4px 10px rgba(20, 24, 26, 0.12));
 }
 
-/* shared section title style. RankineCycle's scoped .page-title mirrors this
-   by hand since svelte scoping means the two can't share one rule. */
+/* shared title style; RankineCycle mirrors this by hand since svelte scopes styles */
 .page-title {
   font-family: var(--font-display);
   font-size: 24px;
@@ -127,7 +120,7 @@ h1, h2, h3, h4 {
   inset: 1.5px;
   z-index: 0;
   clip-path: polygon(calc(var(--cf) - 1.5px) 0, 100% 0, 100% calc(100% - (var(--cf) - 1.5px)), calc(100% - (var(--cf) - 1.5px)) 100%, 0 100%, 0 calc(var(--cf) - 1.5px));
-  background-image: linear-gradient(165deg, var(--steel-650), var(--steel-800) 72%), var(--aluminum);
+  background-image: linear-gradient(165deg, var(--steel-400), var(--steel-650) 72%), var(--aluminum);
   background-repeat: no-repeat, no-repeat;
   background-size: 100% 100%, cover;
   background-position: center, center;
@@ -157,6 +150,43 @@ h1, h2, h3, h4 {
 
 /* small chamfer for compact chips and badges */
 .chamfer-sm { --cf: 6px; }
+
+/* standard chrome for every clickable chamfer button/link: teal hover, pressed
+   dip + glow flash, steady teal only when toggled on/current (nav-current and
+   aria-pressed read the same; a plain action button like reset returns to ink
+   after the click, it never stays teal). Every action button/link in the app
+   should use this instead of a one-off hover/active block. */
+button.chamfer-panel,
+a.chamfer-panel {
+  color: var(--ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s ease, transform 0.15s ease, filter 0.15s ease;
+}
+/* hover:hover excludes touch - without it, a tap leaves :hover "stuck" on
+   mobile (no mouseleave ever fires), so every button would look permanently
+   teal after the first tap instead of just the ones meant to stay that way */
+@media (hover: hover) and (pointer: fine) {
+  button.chamfer-panel:hover,
+  a.chamfer-panel:hover {
+    color: var(--teal-dim);
+    filter: brightness(1.08);
+  }
+}
+button.chamfer-panel:active,
+a.chamfer-panel:active {
+  transform: translateY(1px);
+  filter: brightness(0.94);
+  color: var(--teal-dim);
+  text-shadow: 0 0 10px var(--teal), 0 0 2px var(--teal);
+  transition: transform 0.1s ease, filter 0.1s ease, text-shadow 0.05s ease;
+}
+button.chamfer-panel[aria-current="page"],
+a.chamfer-panel[aria-current="page"],
+button.chamfer-panel[aria-pressed="true"],
+a.chamfer-panel[aria-pressed="true"] {
+  color: var(--teal-dim);
+}
 
 /* drafting paper panel, near-white sheet on a chamfered aluminum mat. */
 .drafting-mat {
@@ -264,14 +294,16 @@ h1, h2, h3, h4 {
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
-  /* ios safari falls back to a plain white thumb in dark mode unless color-scheme
-     is set directly on the control, not just on html. */
-  color-scheme: light;
+  color-scheme: light; /* else ios safari falls back to a white thumb in dark mode */
   width: 100%;
   height: 22px;
   background: transparent;
   outline: none;
   cursor: pointer;
+}
+input[type="range"]:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 input[type="range"]::-webkit-slider-runnable-track {
   height: 8px;
@@ -284,11 +316,7 @@ input[type="range"]::-webkit-slider-runnable-track {
   border: 1px solid var(--hairline);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
 }
-/* knob tint uses layered backgrounds, not background-blend-mode, since blend modes
-   don't reliably apply to the range thumb pseudo-element on mobile safari/chrome.
-   uses --slider-tint (plain rgba, set alongside --slider-color per slider group)
-   instead of color-mix, since color-mix support is inconsistent on phones and
-   drops the whole background when unsupported. */
+/* layered backgrounds not background-blend-mode (unreliable on mobile thumbs); rgba not color-mix (inconsistent phone support) */
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 20px;

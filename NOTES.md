@@ -84,6 +84,56 @@ An earlier version added a reheat term to `Ex_sg` only, not to `eta_2`'s
 denominator, double-counting ~78.7 MW of internal reheat and causing the two
 efficiency readouts to disagree (W_net/Ex_sg ≈71.5% vs true eta_2 ≈81.6%,
 `diagnose.py`). Fixed by defining `Ex_sg` once and dividing by it for both.
+Superseded by `Ex_source`/`Ex_steam` below - `Ex_sg` no longer exists in the
+code, kept here as history.
+
+**2nd law efficiency, `Ex_source`/`Irr_sg` (all three cycles)**: the original
+`eta_2 = W_net/Ex_sg` (renamed `Ex_steam`) is exergy gained by the *working
+fluid* crossing the boiler/SHX - it can't see how irreversibly that heat was
+actually delivered. Bypassing every FWH (Rankine) forces colder feedwater
+into the boiler, which is strictly worse, but cutting the FWHs' own mixing
+losses can outweigh the now-larger (and invisible, to `Ex_steam`) boiler
+irreversibility, so `eta_2` went *up* under bypass while `eta_1` correctly
+went down. Fixed by referencing `eta_2` to the exergy given up by the
+*primary loop* instead (`Ex_source = Qdot*(1 - T0/T_lm)`, T_lm the log-mean
+temperature of the primary stream's own supply/return) - a stream's exergy
+release is independent of what receives it, so this can't be gamed by any
+steam/gas-side slider. Splits total irreversibility into `Irr_sg =
+Ex_source - Ex_steam` (lost transferring heat into the working fluid) and
+`Irr_cycle = Ex_steam - W_net` (lost downstream); `Irr_sg` swept across the
+full slider range for all three cycles to confirm it never goes negative
+(`sweep_irr_sg.mjs`-style scripts) - CO2 Brayton needed T1/T3's slider max
+dropped from 600 to 560 C to keep it that way, since both turbine inlets
+draw straight from the primary loop and 600 C would mean heating the gas
+above its own heat source.
+
+**Primary vs. intermediate loop identity, 565/505 C**: initially cited as
+FLiBe conditions from Colliva et al. 2024 (Table 1), since that's the paper
+the cycle layout itself is sourced from. Wrong in one respect - the plant's
+own diagram (`public/diagrams/fusion-*.png`) labels the stream reaching the
+steam generator "Solar Salt", not FLiBe. Confirmed (via direct follow-up on
+the design) that this plant actually has two loops: a FLiBe primary loop that
+cools the blanket and never touches the power cycle, feeding a double-wall
+heat exchanger (DWHX), and a solar-salt (60% NaNO3/40% KNO3) intermediate
+loop that carries heat from the DWHX to the steam generator/SHX - the latter
+is what `Ex_source` in the solvers and the diagrams both mean. The 565/505 C
+supply/return and 645 MWth duty are confirmed (Colliva et al. 2024, Table 1)
+and apply regardless of which loop's fluid identity is used, since the exergy
+calc only needs the two temperatures and the duty, not mass flow or cp. See
+`RankineEquations.astro`'s sources list for the full citation trail (Colliva
+Sustainability 2024, Colliva Fusion Eng. Des. 2024, MANTA arXiv:2405.20243).
+
+**Circulating-water pump lift, natural- vs. mechanical-draft tower**: the CW
+pump head model in `rankineSolver.js` was first written assuming a
+mechanical-draft tower (fan-assisted, `H_LIFT = 12` m to "a typical
+mechanical-draft tower's distribution deck"). Corrected - this plant is
+modeled with a natural-draft hyperbolic tower (buoyancy-driven, no fan).
+That mostly changes the empty chimney shell above the fill, not the pump
+head: the pump only lifts water to the top of the fill/distribution deck,
+so `H_LIFT` was bumped modestly to 15 m (a large natural-draft tower's fill
+deck tends to sit a bit higher than a compact mechanical-draft unit's) rather
+than rescaled to the tower's full structural height. Still a generic
+plant-scale ballpark, not a verified figure for this specific design.
 
 **T-s diagram, turbine expansion paths**: parameterized by entropy, not
 enthalpy, to avoid an artifact where the 250-bar isobar's S-curve near the
