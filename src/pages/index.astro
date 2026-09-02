@@ -34,12 +34,11 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   </section>
   <div class="hero-bottom-bar"></div>
 
-  <div class="construction-notice chamfer-panel chamfer-sm">
+  <div class="construction-notice chamfer-panel chamfer-sm chamfer-all">
     <div class="construction-stripe" aria-hidden="true"></div>
-    <span class="construction-icon" aria-hidden="true">🚧</span>
     <div class="construction-copy">
       <p class="construction-title">Under Construction</p>
-      <p class="construction-text">This Overview page is still being built out - more is coming soon.</p>
+      <p class="construction-text">This Overview page is still being built out. More is coming soon.</p>
     </div>
   </div>
 
@@ -311,12 +310,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   /* always visible, not the dev-only overlay */
   .construction-notice {
     position: relative;
-    display: flex;
-    align-items: center;
-    gap: 14px;
     max-width: 1028px;
     margin: 24px auto 0;
-    padding: 14px 20px 14px 22px;
+    padding: 14px 20px;
     overflow: hidden;
   }
   .construction-stripe {
@@ -330,11 +326,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       var(--amber) 0 10px,
       var(--paper) 10px 20px
     );
-  }
-  .construction-icon {
-    flex-shrink: 0;
-    font-size: 26px;
-    line-height: 1;
   }
   .construction-copy { min-width: 0; }
   .construction-title {
