@@ -26,7 +26,7 @@
   --red: #ff6459;
   --red-dim: #c0392b;
   --chamfer: 14px;
-  --aluminum: url('/textures/brushed-aluminum.webp'); /* never tiled, always background-size cover */
+  --aluminum: url('/textures/brushed-aluminum.webp'); /* cover for bounded panels (.chamfer-panel); on full-width bars, use a fixed-width tile (e.g. 900px auto) repeated horizontally instead - see .site-nav/.hero-bottom-bar - cover stretches the grain's scale with viewport width and blurs on wide screens, and a tile locked to the bar's short height instead of a fixed width is too narrow, so its repeat seam reads as a barcode */
   --stainless: url('/textures/stainless-steel.webp'); /* grain-free, safe for small or stretched crops */
 
   --font-display: 'Switzer', 'Segoe UI', sans-serif;

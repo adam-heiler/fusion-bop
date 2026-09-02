@@ -114,18 +114,57 @@ const isCurrent = (href: string) => path === href || (href !== '/' && path.start
 <style is:global>
   .site-nav {
     position: relative;
+    isolation: isolate;
     padding: 0.55rem 1.5rem;
     min-height: 54px;
     background-image:
       linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 40%),
-      linear-gradient(180deg, var(--steel-650), var(--steel-800)),
-      var(--aluminum);
-    background-repeat: no-repeat, no-repeat, no-repeat;
-    background-size: 100% 100%, 100% 100%, cover;
-    background-position: center, center, center;
-    background-blend-mode: normal, overlay, normal;
+      linear-gradient(180deg, var(--steel-650), var(--steel-800));
+    background-repeat: no-repeat, no-repeat;
+    background-size: 100% 100%, 100% 100%;
+    background-position: center, center;
     border-bottom: 1.5px solid var(--steel-900);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+  }
+  /* aluminum grain: two copies of the same fixed-width tile, offset by half
+     a tile from each other and cross-faded between (each one's mask is
+     opaque through its own middle and transparent at its own edges, so
+     wherever ::before is fading out, ::after's middle - which lines up
+     exactly there, being a half-tile off - is fading in). That overlap is
+     what actually blends the seam: two DIFFERENT slices of the source
+     texture dissolving into each other, not one texture dipping in and out
+     on its own (which was tried first and didn't hide anything, since a
+     single layer fading toward its own seam still shows that same seam,
+     just dimmer). Not background-size: cover, which stretched the whole
+     texture to match viewport width - on a wide screen that either
+     upscaled it past its native resolution (blurry) or, past a point,
+     compressed the grain enough to alias into a wood-grain moire. z-index
+     -1 keeps both copies behind .site-nav-inner's real content. */
+  .site-nav::before,
+  .site-nav::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: var(--aluminum);
+    background-repeat: repeat-x;
+    background-size: 900px auto;
+    background-position: 0 center;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+    -webkit-mask-image: repeating-linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+    mask-image: repeating-linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+    -webkit-mask-size: 900px 100%;
+    mask-size: 900px 100%;
+    -webkit-mask-repeat: repeat-x;
+    mask-repeat: repeat-x;
+    -webkit-mask-position: 0 center;
+    mask-position: 0 center;
+  }
+  .site-nav::after {
+    background-position: 450px center;
+    -webkit-mask-position: 450px center;
+    mask-position: 450px center;
   }
 
   /* matches .page-container width so the logo and page titles share a left edge */

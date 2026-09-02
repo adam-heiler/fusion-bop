@@ -1,8 +1,10 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import HeBraytonCycle from '../components/HeBraytonCycle.svelte';
+import UnderConstructionOverlay from '../components/UnderConstructionOverlay.astro';
 ---
 <BaseLayout title="He Brayton">
+  <UnderConstructionOverlay />
   <section class="he-hero">
     <div class="he-align">
       <div class="title-row">
@@ -171,19 +173,46 @@ import HeBraytonCycle from '../components/HeBraytonCycle.svelte';
 
   /* brushed-metal strip matching the nav bar's chamfer-panel rim weight */
   .hero-bottom-bar {
+    position: relative;
+    isolation: isolate;
     height: 16px;
     margin: 0 -24px;
     background-image:
       linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 40%),
-      linear-gradient(180deg, var(--steel-650), var(--steel-800)),
-      var(--aluminum);
-    background-repeat: no-repeat, no-repeat, no-repeat;
-    background-size: 100% 100%, 100% 100%, cover;
-    background-position: center, center, center;
-    background-blend-mode: normal, overlay, normal;
+      linear-gradient(180deg, var(--steel-650), var(--steel-800));
+    background-repeat: no-repeat, no-repeat;
+    background-size: 100% 100%, 100% 100%;
+    background-position: center, center;
     border-top: 1.5px solid var(--steel-900);
     border-bottom: 1.5px solid var(--steel-900);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+  }
+  /* aluminum grain: two copies of the same fixed-width tile, offset by half
+     a tile and cross-faded between - see BaseLayout.astro's .site-nav. */
+  .hero-bottom-bar::before,
+  .hero-bottom-bar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--aluminum);
+    background-repeat: repeat-x;
+    background-size: 900px auto;
+    background-position: 0 center;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+    -webkit-mask-image: repeating-linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+    mask-image: repeating-linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+    -webkit-mask-size: 900px 100%;
+    mask-size: 900px 100%;
+    -webkit-mask-repeat: repeat-x;
+    mask-repeat: repeat-x;
+    -webkit-mask-position: 0 center;
+    mask-position: 0 center;
+  }
+  .hero-bottom-bar::after {
+    background-position: 450px center;
+    -webkit-mask-position: 450px center;
+    mask-position: 450px center;
   }
 
   /* spacing so the title isn't flush against the bar above */

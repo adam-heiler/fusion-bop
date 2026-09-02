@@ -111,7 +111,7 @@
       solving for it, so the same energy balance is run in reverse. Given the
       boiler's total thermal duty, the mass flow rate of steam it can support is
     </p>
-    <div class="eq-formula">ṁ = <span class="q-rate">Q</span> / (h<sub>1</sub> − h<sub>15</sub>), where <span class="q-rate">Q</span> is the duty slider (MW) converted to watts</div>
+    <div class="eq-formula">ṁ = Q&#775; / (h<sub>1</sub> − h<sub>15</sub>), where Q&#775; is the duty slider (MW) converted to watts</div>
     <p>
       In this model, the duty arrives from the plant's <em>intermediate</em> loop, 
       which is the solar-salt stream shown in the diagram above. I assume the solar salt enters
@@ -457,7 +457,7 @@
       definition from any thermodynamics textbook: net work out divided by heat
       in, straight from conservation of energy (Moran et al., Ch. 8).
     </p>
-    <div class="eq-formula">η<sub>1st law</sub> = W<sub>net</sub> / <span class="q-rate">Q</span></div>
+    <div class="eq-formula">η<sub>1st law</sub> = W<sub>net</sub> / Q&#775;</div>
     <p>
       The second-law (exergetic) efficiency compares the net work out to the
       exergy, or maximum possible work, that was actually available to extract.
@@ -481,7 +481,7 @@
       extra irreversibility of the wider-ΔT boiler heat exchange.
     </p>
     <p>
-      Plain first-law efficiency never has this loophole - <span class="q-rate">Q</span> is <span class="q-rate">Q</span> no matter how it's delivered - which is why a whole-plant
+      Plain first-law efficiency never has this loophole - Q&#775; is Q&#775; no matter how it's delivered - which is why a whole-plant
       second-law efficiency is conventionally referenced against the exergy of
       the resource actually supplying the heat, not the exergy of whatever
       happens to receive it (Moran et al., Ch. 7, draws exactly this
@@ -493,11 +493,11 @@
       intermediate loop's full cooldown from T<sub>in</sub> to T<sub>out</sub> gives
       the total exergy it gives up:
     </p>
-    <div class="eq-formula">Ex<sub>source</sub> = ∫ (1 − T<sub>0</sub>/T)·δ<span class="q-rate">Q</span>, integrated from T<sub>in</sub> to T<sub>out</sub></div>
+    <div class="eq-formula">Ex<sub>source</sub> = ∫ (1 − T<sub>0</sub>/T)·δQ&#775;, integrated from T<sub>in</sub> to T<sub>out</sub></div>
     <p>
       For a stream of roughly constant cp (a fair assumption for solar salt over a
-      60 °C span with no phase change), δ<span class="q-rate">Q</span> = −ṁcp·dT, and that integral
-      works out in closed form to <span class="q-rate">Q</span>·(1 − T<sub>0</sub>/T<sub>lm</sub>), where
+      60 °C span with no phase change), δQ&#775; = −ṁcp·dT, and that integral
+      works out in closed form to Q&#775;·(1 − T<sub>0</sub>/T<sub>lm</sub>), where
       T<sub>lm</sub> is the log-mean (entropic-average, not arithmetic-average)
       temperature - the same log-mean-temperature-difference logic from a
       heat-transfer course, applied here to exergy instead of heat rate. This
@@ -505,7 +505,7 @@
       stream's mass flow or its actual cp value:
     </p>
     <div class="eq-formula">T<sub>lm</sub> = (T<sub>in</sub> − T<sub>out</sub>) / ln(T<sub>in</sub>/T<sub>out</sub>)</div>
-    <div class="eq-formula">Ex<sub>source</sub> = <span class="q-rate">Q</span>·(1 − T<sub>0</sub>/T<sub>lm</sub>)</div>
+    <div class="eq-formula">Ex<sub>source</sub> = Q&#775;·(1 − T<sub>0</sub>/T<sub>lm</sub>)</div>
     <p>
       T<sub>in</sub> and T<sub>out</sub> are the intermediate (solar-salt)
       loop's own supply and return temperatures at the steam generator: 565 °C
@@ -516,7 +516,7 @@
       puts T<sub>lm</sub> at 807.7 K (534.6 °C) and the Carnot factor
       1 − T<sub>0</sub>/T<sub>lm</sub> at 0.631 for a 25 °C ambient - the
       ceiling every cycle's second-law efficiency is measured against below.
-      Ex<sub>source</sub> doesn't depend on any steam-side slider at all, only on <span class="q-rate">Q</span> and ambient
+      Ex<sub>source</sub> doesn't depend on any steam-side slider at all, only on Q&#775; and ambient
       T<sub>0</sub>, so it can't be gamed by changing how the feedwater arrives.
       Second-law efficiency is computed against it instead of Ex<sub>steam</sub>:
     </p>
@@ -552,7 +552,7 @@
 
     <p class="eq-subhead">Gauges</p>
     <ul class="eq-instances">
-      <li><span class="eq-instance-name">1st law efficiency</span>: η<sub>1st law</sub> = W<sub>net</sub> / <span class="q-rate">Q</span></li>
+      <li><span class="eq-instance-name">1st law efficiency</span>: η<sub>1st law</sub> = W<sub>net</sub> / Q&#775;</li>
       <li><span class="eq-instance-name">2nd law efficiency</span>: η<sub>2nd law</sub> = W<sub>net</sub> / Ex<sub>source</sub></li>
       <li><span class="eq-instance-name">LP exhaust quality</span>: x<sub>5</sub>, or 1 (full quality) if the exhaust came out superheated instead of wet</li>
       <li><span class="eq-instance-name">Pump power fraction</span>: W<sub>pumps</sub> / W<sub>turbines</sub></li>
@@ -571,7 +571,7 @@
       <li><span class="eq-instance-name">Condensate pump power</span>: W<sub>condpump</sub> = flow<sub>FWH1</sub>·(h<sub>7</sub> − h<sub>6</sub>)</li>
       <li><span class="eq-instance-name">Circulating pump power</span>: W<sub>cwpump</sub> = ṁ<sub>cw</sub>·(h<sub>cw,out</sub> − h<sub>cw,in</sub>)</li>
       <li><span class="eq-instance-name">Exergy to working fluid</span>: Ex<sub>steam</sub> = ṁ·[(h<sub>1</sub> − h<sub>15</sub>) − T<sub>0</sub>·(s<sub>1</sub> − s<sub>15</sub>)]</li>
-      <li><span class="eq-instance-name">Total steam flow</span>: ṁ = <span class="q-rate">Q</span> / (h<sub>1</sub> − h<sub>15</sub>)</li>
+      <li><span class="eq-instance-name">Total steam flow</span>: ṁ = Q&#775; / (h<sub>1</sub> − h<sub>15</sub>)</li>
       <li><span class="eq-instance-name">Circulating water flow</span>: ṁ<sub>cw</sub> = r<sub>cw</sub>·ṁ, where r<sub>cw</sub> is the circulating-water-to-steam mass ratio slider</li>
       <li><span class="eq-instance-name">Condenser pressure</span>: P<sub>6</sub> = P<sub>sat</sub>(T<sub>6</sub>), the converged condenser saturation pressure from the trial loop above</li>
       <li><span class="eq-instance-name">Condenser TTD</span>: TTD<sub>cond,eff</sub> = T<sub>6</sub> − T<sub>cw,out</sub>, where T<sub>cw,out</sub> = T<sub>cw,in</sub> + Q<sub>cond</sub>/(ṁ<sub>cw</sub>·cp<sub>cw</sub>)</li>
@@ -695,26 +695,6 @@
     margin: 4px 0 14px 6px;
   }
   .eq-formula.eq-wrap-tight { line-height: 1.7; margin-bottom: 14px; }
-
-  /* Q̇'s combining dot (U+0307) sits almost flush with the cap-height on most
-     fonts - barely visible, unlike ṁ's, which has a lowercase letter's extra
-     headroom to sit in. Drawn as an absolutely-positioned pseudo-element
-     instead, so the Q itself stays in normal inline flow (same baseline as
-     surrounding text, no per-font vertical-align tuning) and the dot just
-     floats above it. */
-  .q-rate {
-    position: relative;
-    display: inline-block;
-  }
-  .q-rate::before {
-    content: '•';
-    position: absolute;
-    top: -0.5em;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 0.5em;
-    line-height: 1;
-  }
 
   /* same engraved-groove technique as the section divider, thinner and lighter */
   .eq-instances li,

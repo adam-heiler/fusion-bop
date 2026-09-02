@@ -1,0 +1,50 @@
+---
+// Prod-only. Hidden during `astro dev`.
+---
+{!import.meta.env.DEV && (
+  <div class="uc-overlay">
+    <div class="uc-panel chamfer-panel chamfer-all">
+      <span class="uc-icon" aria-hidden="true">🚧</span>
+      <h2>Under Construction</h2>
+      <p>This page isn't ready yet. Check back soon.</p>
+    </div>
+  </div>
+)}
+
+<style>
+  .uc-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(20, 24, 26, 0.82);
+    backdrop-filter: blur(6px);
+  }
+  .uc-panel {
+    max-width: 420px;
+    padding: 32px 36px;
+    text-align: center;
+    background: var(--steel-900);
+  }
+  .uc-icon {
+    display: block;
+    font-size: 40px;
+    margin-bottom: 10px;
+  }
+  .uc-panel h2 {
+    margin: 0 0 8px;
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--paper);
+  }
+  .uc-panel p {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 14px;
+    color: var(--ink-dim);
+  }
+</style>

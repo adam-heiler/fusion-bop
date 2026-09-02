@@ -34,6 +34,15 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   </section>
   <div class="hero-bottom-bar"></div>
 
+  <div class="construction-notice chamfer-panel chamfer-sm">
+    <div class="construction-stripe" aria-hidden="true"></div>
+    <span class="construction-icon" aria-hidden="true">🚧</span>
+    <div class="construction-copy">
+      <p class="construction-title">Under Construction</p>
+      <p class="construction-text">This Overview page is still being built out - more is coming soon.</p>
+    </div>
+  </div>
+
   <div class="about-box">
     <figure class="about-photo-fig">
       <img src="/other_images/me-cooling-tower.jpg" alt="Adam Heiler standing in front of a cooling tower at Nine Mile Point Clean Energy Center" class="about-photo" width="2638" height="3518" />
@@ -43,7 +52,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <div class="about-bio">
         <p class="about-greeting">Hello! I am Adam Heiler</p>
         <p>I'm a senior mechanical engineering undergraduate student at the University of Michigan, and as I'm sure you can probably tell, I love clean energy and thermodynamics.</p>
-        <p>I have spent these past two summers interning with the Balance of Plant team at Nine Mile Point, a two-unit nuclear power plant on <span class="lake-ontario">Lake Ontario</span> in New York State. I am also the Technical Director of SPARK Electric Racing, University of Michigan's electric motorcycle project team.</p>
+        <p>I have spent these past two summers interning with the Balance of Plant team at Nine Mile Point, a two-unit nuclear power plant on Lake Ontario in New York State. I am also the Technical Director of SPARK Electric Racing, University of Michigan's electric motorcycle project team.</p>
         <p>I love my dogs, exploring new cities, hiking, going to Michigan football games, playing piano, learning guitar, and drumming in Groove Percussion and Performance Group.</p>
         <p>Enjoy my website!</p>
       </div>
@@ -56,30 +65,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     </div>
   </div>
 </BaseLayout>
-
-<script>
-  // "Lake Ontario" highlight: fires once, a few seconds after the bio
-  // scrolls into view, not immediately on entry - re-bound on astro:page-load
-  // since ClientRouter swaps the DOM without a full reload.
-  const HIGHLIGHT_DELAY = 2500; // ms after scrolling into view
-
-  function initLakeOntarioHighlight() {
-    const el = document.querySelector<HTMLElement>('.lake-ontario');
-    if (!el || el.dataset.observed) return;
-    el.dataset.observed = 'true';
-    const io = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          setTimeout(() => el.classList.add('highlight-active'), HIGHLIGHT_DELAY);
-          io.unobserve(el);
-        }
-      }
-    }, { threshold: 0.6 });
-    io.observe(el);
-  }
-  initLakeOntarioHighlight();
-  document.addEventListener('astro:page-load', initLakeOntarioHighlight);
-</script>
 
 <style>
   /* full-bleed hero; overflow hidden stops the bop node glow from growing page height */
@@ -99,19 +84,46 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
   /* brushed-metal strip matching the nav bar's chamfer-panel rim weight */
   .hero-bottom-bar {
+    position: relative;
+    isolation: isolate;
     height: 16px;
     margin: 0 -24px;
     background-image:
       linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 40%),
-      linear-gradient(180deg, var(--steel-650), var(--steel-800)),
-      var(--aluminum);
-    background-repeat: no-repeat, no-repeat, no-repeat;
-    background-size: 100% 100%, 100% 100%, cover;
-    background-position: center, center, center;
-    background-blend-mode: normal, overlay, normal;
+      linear-gradient(180deg, var(--steel-650), var(--steel-800));
+    background-repeat: no-repeat, no-repeat;
+    background-size: 100% 100%, 100% 100%;
+    background-position: center, center;
     border-top: 1.5px solid var(--steel-900);
     border-bottom: 1.5px solid var(--steel-900);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+  }
+  /* aluminum grain: two copies of the same fixed-width tile, offset by half
+     a tile and cross-faded between - see BaseLayout.astro's .site-nav. */
+  .hero-bottom-bar::before,
+  .hero-bottom-bar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--aluminum);
+    background-repeat: repeat-x;
+    background-size: 900px auto;
+    background-position: 0 center;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+    -webkit-mask-image: repeating-linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+    mask-image: repeating-linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+    -webkit-mask-size: 900px 100%;
+    mask-size: 900px 100%;
+    -webkit-mask-repeat: repeat-x;
+    mask-repeat: repeat-x;
+    -webkit-mask-position: 0 center;
+    mask-position: 0 center;
+  }
+  .hero-bottom-bar::after {
+    background-position: 450px center;
+    -webkit-mask-position: 450px center;
+    mask-position: 450px center;
   }
 
   .hero-heading {
@@ -296,6 +308,51 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     .bop-node-line { font-size: 22px; }
   }
 
+  /* always visible, not the dev-only overlay */
+  .construction-notice {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: 1028px;
+    margin: 24px auto 0;
+    padding: 14px 20px 14px 22px;
+    overflow: hidden;
+  }
+  .construction-stripe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background-image: repeating-linear-gradient(
+      -45deg,
+      var(--amber) 0 10px,
+      var(--paper) 10px 20px
+    );
+  }
+  .construction-icon {
+    flex-shrink: 0;
+    font-size: 26px;
+    line-height: 1;
+  }
+  .construction-copy { min-width: 0; }
+  .construction-title {
+    margin: 0 0 2px;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--paper);
+  }
+  .construction-text {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--ink-dim);
+  }
+
   /* matches .rankine-align's content width (simulator-box's 1100px minus its 72px padding).
 
      Bottom alignment, done properly this time: two independently-sized images with
@@ -353,42 +410,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     font-weight: 700;
   }
 
-  /* Lake Ontario, not "Lake America" - a highlighter-marker stroke sweeps in
-     behind the name a few seconds after the bio scrolls into view (see script
-     below), then pulses twice to make sure it gets noticed, and stays lit. */
-  .lake-ontario {
-    position: relative;
-    z-index: 0;
-    display: inline-block;
-    white-space: nowrap;
-  }
-  .lake-ontario::before {
-    content: '';
-    position: absolute;
-    z-index: -1;
-    left: 0;
-    top: 12%;
-    bottom: 2%;
-    width: 0%;
-    background: #ffe135;
-    opacity: 0.75;
-    border-radius: 2px;
-  }
-  .lake-ontario.highlight-active::before {
-    animation:
-      lake-ontario-sweep 1.4s cubic-bezier(0.65, 0, 0.35, 1) forwards,
-      lake-ontario-pulse 1.3s ease-in-out 1.4s 2;
-  }
-  @keyframes lake-ontario-sweep {
-    to { width: 100%; }
-  }
-  @keyframes lake-ontario-pulse {
-    0%, 100% { opacity: 0.75; }
-    50% { opacity: 1; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .lake-ontario::before { width: 100%; animation: none; }
-  }
   /* fills whatever height is left in the stretched .about-text column after the bio */
   .ann-arbor-fig {
     flex: 1 1 auto;
